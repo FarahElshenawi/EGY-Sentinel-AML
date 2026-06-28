@@ -1,0 +1,27 @@
+# EGY-Sentinel AML — Python dependencies
+# Pin exact versions on Day 7 before Docker freeze
+
+# Data
+pandas>=2.2
+pyarrow>=15.0
+
+# Graph
+networkx>=3.2
+neo4j>=5.18
+
+# ML
+scikit-learn>=1.4
+xgboost>=2.0
+
+# Service
+fastapi>=0.110
+uvicorn[standard]>=0.27
+pydantic>=2.6
+python-multipart>=0.0.9
+
+# Notebooks + Demo (Streamlit fallback)
+jupyterlab>=4.1
+streamlit>=1.32
+
+# Tests
+pytest>=8.0
