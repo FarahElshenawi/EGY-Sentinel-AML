@@ -1,0 +1,47 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://egy-sentinel-aml/schemas/account.json",
+  "title": "Account",
+  "description": "A node in the transaction graph. Represents a PaySim account (nameOrig or nameDest).",
+  "type": "object",
+  "required": ["account_id", "risk_score", "risk_band"],
+  "properties": {
+    "account_id": {
+      "type": "string",
+      "description": "PaySim account identifier (e.g., 'C1234567')."
+    },
+    "type": {
+      "type": "string",
+      "enum": ["personal", "merchant", "unknown"],
+      "default": "unknown",
+      "description": "Inferred account type (PaySim doesn't provide this directly)."
+    },
+    "in_degree": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of incoming transactions."
+    },
+    "out_degree": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of outgoing transactions."
+    },
+    "risk_score": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Combined risk score (0.5 * rule_score + 0.5 * ml_prob * 100)."
+    },
+    "risk_band": {
+      "type": "string",
+      "enum": ["low", "medium", "high"],
+      "description": "Discretized risk: low (0-30), medium (31-65), high (66-100)."
+    },
+    "pattern_count": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of suspicious patterns this account is involved in."
+    }
+  },
+  "additionalProperties": false
+}

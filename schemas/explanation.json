@@ -1,0 +1,53 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://egy-sentinel-aml/schemas/explanation.json",
+  "title": "Explanation",
+  "description": "Output of the Explanation Agent. Plain-English justification of why a case is suspicious.",
+  "type": "object",
+  "required": ["case_id", "explanation_text", "citations", "confidence"],
+  "properties": {
+    "case_id": {
+      "type": "string",
+      "description": "Reference to the case being explained."
+    },
+    "explanation_text": {
+      "type": "string",
+      "minLength": 100,
+      "maxLength": 1000,
+      "description": "3-5 sentence plain-English explanation citing pattern + anomaly + risk score."
+    },
+    "citations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["type", "value"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["pattern", "anomaly", "score", "transaction"],
+            "description": "What kind of evidence this citation references."
+          },
+          "value": {
+            "type": "string",
+            "description": "The specific evidence (e.g., 'circular transaction A→B→C→D→A')."
+          }
+        },
+        "additionalProperties": false
+      },
+      "minItems": 1,
+      "description": "Every claim in explanation_text must have at least one citation."
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Agent's confidence in the explanation (0.0 = low, 1.0 = high)."
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp."
+    }
+  },
+  "additionalProperties": false
+}

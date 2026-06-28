@@ -1,0 +1,50 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://egy-sentinel-aml/schemas/alert.json",
+  "title": "Alert",
+  "description": "Output of the Alert Agent. Generated when an account crosses the 'high' risk threshold.",
+  "type": "object",
+  "required": ["account_id", "risk_score", "risk_band", "pattern_type", "priority", "summary", "recommended_action"],
+  "properties": {
+    "account_id": {
+      "type": "string",
+      "description": "The account that triggered this alert."
+    },
+    "risk_score": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "The risk score that triggered the alert (copied from the account)."
+    },
+    "risk_band": {
+      "type": "string",
+      "enum": ["low", "medium", "high"],
+      "description": "The risk band (alerts only fire for 'high')."
+    },
+    "pattern_type": {
+      "type": "string",
+      "enum": ["circular", "fan_out", "fan_in", "layering", "dense_cluster", "none"],
+      "description": "The primary suspicious pattern detected. 'none' if flagged by score alone."
+    },
+    "priority": {
+      "type": "string",
+      "enum": ["low", "medium", "high", "critical"],
+      "description": "Alert priority determined by the Alert Agent based on score + pattern + amount."
+    },
+    "summary": {
+      "type": "string",
+      "maxLength": 200,
+      "description": "One-line alert summary (e.g., 'High-risk circular transaction pattern detected')."
+    },
+    "recommended_action": {
+      "type": "string",
+      "description": "Recommended next step (e.g., 'investigate', 'monitor', 'escalate')."
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when the alert was generated."
+    }
+  },
+  "additionalProperties": false
+}

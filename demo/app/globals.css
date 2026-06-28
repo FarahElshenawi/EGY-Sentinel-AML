@@ -1,0 +1,52 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-inter: 'Inter', system-ui, sans-serif;
+  --font-playfair: 'Playfair Display', Georgia, serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+body {
+  font-family: var(--font-inter);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #f6f6f5;
+}
+::-webkit-scrollbar-thumb {
+  background: #c1bba9;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #8b7226;
+}
+
+/* Risk band colors */
+.risk-low { color: #4e9565; }
+.risk-medium { color: #a28856; }
+.risk-high { color: #91534d; }
+
+.bg-risk-low { background-color: #4e9565; }
+.bg-risk-medium { background-color: #a28856; }
+.bg-risk-high { background-color: #91534d; }
+
+/* Loading spinner */
+.spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid #c1bba9;
+  border-top-color: #8b7226;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}

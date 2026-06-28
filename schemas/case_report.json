@@ -1,0 +1,81 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://egy-sentinel-aml/schemas/case_report.json",
+  "title": "Case Report",
+  "description": "Output of the Case Builder Agent. Structured SAR-style investigation report.",
+  "type": "object",
+  "required": ["case_id", "account_id", "alert_id", "timeline", "parties", "total_amount", "pattern_type", "narrative", "sar_fields"],
+  "properties": {
+    "case_id": {
+      "type": "string",
+      "description": "Unique case identifier (e.g., 'CASE-000001')."
+    },
+    "account_id": {
+      "type": "string",
+      "description": "Primary subject of the investigation."
+    },
+    "alert_id": {
+      "type": "string",
+      "description": "Reference to the alert that triggered this case."
+    },
+    "timeline": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["step", "event", "account_id", "amount"],
+        "properties": {
+          "step": { "type": "integer", "description": "Time step (hour)." },
+          "event": { "type": "string", "description": "Description of the event (e.g., 'Transfer to C4567890')." },
+          "account_id": { "type": "string", "description": "Counterparty account." },
+          "amount": { "type": "number", "description": "Transaction amount." }
+        },
+        "additionalProperties": false
+      },
+      "description": "Chronological timeline of suspicious transactions."
+    },
+    "parties": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["account_id", "role", "total_amount"],
+        "properties": {
+          "account_id": { "type": "string" },
+          "role": { "type": "string", "enum": ["sender", "receiver", "intermediary", "subject"] },
+          "total_amount": { "type": "number", "description": "Total amount transacted by this party." }
+        },
+        "additionalProperties": false
+      },
+      "description": "All parties involved in the suspicious activity."
+    },
+    "total_amount": {
+      "type": "number",
+      "description": "Sum of all suspicious transaction amounts."
+    },
+    "pattern_type": {
+      "type": "string",
+      "enum": ["circular", "fan_out", "fan_in", "layering", "dense_cluster"],
+      "description": "The detected money-laundering pattern."
+    },
+    "narrative": {
+      "type": "string",
+      "description": "Multi-paragraph case narrative explaining the suspicious activity."
+    },
+    "sar_fields": {
+      "type": "object",
+      "required": ["filing_reason", "suspicious_activity_type"],
+      "properties": {
+        "filing_reason": { "type": "string", "description": "Reason for filing (e.g., 'Suspected layering')." },
+        "suspicious_activity_type": { "type": "string", "description": "Activity category (e.g., 'structuring', 'funneling')." },
+        "reporting_institution": { "type": "string", "description": "Filing institution name (placeholder for capstone)." },
+        "subject_info": { "type": "string", "description": "Subject identification (placeholder)." }
+      },
+      "additionalProperties": false
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when the case was generated."
+    }
+  },
+  "additionalProperties": false
+}

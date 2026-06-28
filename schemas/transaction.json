@@ -1,0 +1,69 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://egy-sentinel-aml/schemas/transaction.json",
+  "title": "Transaction",
+  "description": "An edge in the transaction graph. One row from the PaySim dataset.",
+  "type": "object",
+  "required": ["txn_id", "step", "type", "amount", "nameOrig", "nameDest", "isFraud"],
+  "properties": {
+    "txn_id": {
+      "type": "string",
+      "description": "Generated unique transaction ID (e.g., 'TXN-000001')."
+    },
+    "step": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 743,
+      "description": "Time step in hours (1 = first hour, ~743 = end of 30-day simulation)."
+    },
+    "type": {
+      "type": "string",
+      "enum": ["CASH_IN", "CASH_OUT", "DEBIT", "PAYMENT", "TRANSFER"],
+      "description": "Transaction type. Fraud only occurs in CASH_OUT and TRANSFER."
+    },
+    "amount": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Transaction amount. Range: 0 to ~92 million."
+    },
+    "nameOrig": {
+      "type": "string",
+      "description": "Sender account ID."
+    },
+    "nameDest": {
+      "type": "string",
+      "description": "Receiver account ID."
+    },
+    "oldbalanceOrg": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Sender balance before transaction."
+    },
+    "newbalanceOrig": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Sender balance after transaction."
+    },
+    "oldbalanceDest": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Receiver balance before transaction."
+    },
+    "newbalanceDest": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Receiver balance after transaction."
+    },
+    "isFraud": {
+      "type": "integer",
+      "enum": [0, 1],
+      "description": "Ground truth fraud label (1 = fraud, 0 = normal)."
+    },
+    "isFlaggedFraud": {
+      "type": "integer",
+      "enum": [0, 1],
+      "description": "Original PaySim flag (only 16 of 8,213 frauds flagged — essentially useless)."
+    }
+  },
+  "additionalProperties": false
+}
