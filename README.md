@@ -6,8 +6,6 @@
 
 EGY-Sentinel AML is an enterprise-grade anti-money laundering (AML) platform that combines graph-based intelligence, machine learning risk scoring, and agentic AI investigation to detect financial crime that traditional rule-based systems miss.
 
-Built by a 7-engineer team in a compressed 10-day academic capstone sprint.
-
 ---
 
 ## 🎯 The Problem
@@ -223,6 +221,3 @@ See `schemas/README.md` for details.
 
 Academic Capstone Project — 2026
 
----
-
-*Built by 7 engineers in 10 days. Total cost: $0.*
