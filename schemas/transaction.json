@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://egy-sentinel-aml/schemas/transaction.json",
   "title": "Transaction",
-  "description": "An edge in the transaction graph. One row from the PaySim dataset.",
+  "description": "An edge in the transaction graph. Contains all PaySim native fields for audit and evidence purposes.",
   "type": "object",
   "required": ["txn_id", "step", "type", "amount", "nameOrig", "nameDest", "isFraud"],
   "properties": {
@@ -14,12 +14,12 @@
       "type": "integer",
       "minimum": 1,
       "maximum": 743,
-      "description": "Time step in hours (1 = first hour, ~743 = end of 30-day simulation)."
+      "description": "PaySim time step in hours (1 = first hour, ~743 = end of 30-day simulation)."
     },
     "type": {
       "type": "string",
       "enum": ["CASH_IN", "CASH_OUT", "DEBIT", "PAYMENT", "TRANSFER"],
-      "description": "Transaction type. Fraud only occurs in CASH_OUT and TRANSFER."
+      "description": "PaySim transaction type. Fraud only occurs in CASH_OUT and TRANSFER."
     },
     "amount": {
       "type": "number",
@@ -37,32 +37,32 @@
     "oldbalanceOrg": {
       "type": "number",
       "minimum": 0,
-      "description": "Sender balance before transaction."
+      "default": 0,
+      "description": "Sender balance before transaction. Needed for DS-1/3 'balance-drain' rule (Rule 2)."
     },
     "newbalanceOrig": {
       "type": "number",
       "minimum": 0,
+      "default": 0,
       "description": "Sender balance after transaction."
     },
     "oldbalanceDest": {
       "type": "number",
       "minimum": 0,
+      "default": 0,
       "description": "Receiver balance before transaction."
     },
     "newbalanceDest": {
       "type": "number",
       "minimum": 0,
+      "default": 0,
       "description": "Receiver balance after transaction."
     },
     "isFraud": {
       "type": "integer",
       "enum": [0, 1],
-      "description": "Ground truth fraud label (1 = fraud, 0 = normal)."
-    },
-    "isFlaggedFraud": {
-      "type": "integer",
-      "enum": [0, 1],
-      "description": "Original PaySim flag (only 16 of 8,213 frauds flagged — essentially useless)."
+      "default": 0,
+      "description": "Ground truth fraud label (1 = fraud, 0 = normal). Hidden from ML input, used for evaluation only."
     }
   },
   "additionalProperties": false

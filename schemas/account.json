@@ -2,45 +2,40 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://egy-sentinel-aml/schemas/account.json",
   "title": "Account",
-  "description": "A node in the transaction graph. Represents a PaySim account (nameOrig or nameDest).",
+  "description": "A node in the transaction graph. Combines PaySim identity with DS-2 graph metrics and DS-1/3 ML scores.",
   "type": "object",
   "required": ["account_id", "risk_score", "risk_band"],
   "properties": {
     "account_id": {
       "type": "string",
-      "description": "PaySim account identifier (e.g., 'C1234567')."
-    },
-    "type": {
-      "type": "string",
-      "enum": ["personal", "merchant", "unknown"],
-      "default": "unknown",
-      "description": "Inferred account type (PaySim doesn't provide this directly)."
+      "description": "PaySim account identifier (nameOrig or nameDest)."
     },
     "in_degree": {
       "type": "integer",
       "minimum": 0,
-      "description": "Number of incoming transactions."
+      "description": "Number of incoming transactions (from DS-2 graph engine)."
     },
     "out_degree": {
       "type": "integer",
       "minimum": 0,
-      "description": "Number of outgoing transactions."
+      "description": "Number of outgoing transactions (from DS-2 graph engine)."
+    },
+    "pattern_count": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "Number of suspicious patterns detected for this account (from DS-2 detectors: circular, fan_out, dense_cluster)."
     },
     "risk_score": {
       "type": "number",
       "minimum": 0,
       "maximum": 100,
-      "description": "Combined risk score (0.5 * rule_score + 0.5 * ml_prob * 100)."
+      "description": "Combined final score: 0.5 * rule_score + 0.5 * ml_prob * 100 (from DS-1/3)."
     },
     "risk_band": {
       "type": "string",
       "enum": ["low", "medium", "high"],
-      "description": "Discretized risk: low (0-30), medium (31-65), high (66-100)."
-    },
-    "pattern_count": {
-      "type": "integer",
-      "minimum": 0,
-      "description": "Number of suspicious patterns this account is involved in."
+      "description": "Discretized risk band: low (0-30), medium (31-65), high (66-100)."
     }
   },
   "additionalProperties": false

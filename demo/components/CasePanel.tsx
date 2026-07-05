@@ -1,93 +1,68 @@
 'use client';
 
 import type { CaseReport } from '@/types';
+import { fmtMoney, fmtNumber } from '@/lib/format';
 
-interface CasePanelProps {
-  caseReport: CaseReport;
-}
-
-export default function CasePanel({ caseReport }: CasePanelProps) {
-  const fmtMoney = (n: number) => {
-    if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
-    if (n >= 1_000) return `$${(n / 1_000).toFixed(1)}K`;
-    return `$${n.toFixed(2)}`;
-  };
-
+export default function CasePanel({ caseReport }: { caseReport: CaseReport }) {
   return (
-    <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-      <div className="px-4 py-3 bg-gradient-to-r from-gray-800 to-gray-700 text-white">
+    <div className="bg-[var(--bg-surface)] rounded-lg border border-[var(--border-default)] shadow-sm overflow-hidden">
+      <div className="px-4 py-3 bg-[var(--text-primary)] text-white">
         <div className="flex items-center justify-between">
-          <h3 className="font-semibold flex items-center gap-2">
-            <span>📋</span> Case Report
-          </h3>
+          <h3 className="font-semibold flex items-center gap-2 text-sm"><span>📋</span> Case Report</h3>
           <span className="font-mono text-xs opacity-75">{caseReport.case_id}</span>
         </div>
       </div>
       <div className="p-4 space-y-4">
-        {/* Narrative */}
         <div>
-          <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Narrative</p>
-          <p className="text-sm text-gray-800 leading-relaxed">{caseReport.narrative}</p>
+          <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-semibold mb-1">Narrative</p>
+          <p className="text-sm text-[var(--text-primary)] leading-relaxed" style={{ fontFamily: 'var(--font-serif)' }}>{caseReport.narrative}</p>
         </div>
-
-        {/* Total amount + Pattern */}
         <div className="grid grid-cols-2 gap-3">
-          <div className="bg-gray-50 rounded p-3">
-            <p className="text-xs text-gray-500 uppercase tracking-wide">Total Amount</p>
-            <p className="font-bold text-lg text-gray-900">{fmtMoney(caseReport.total_amount)}</p>
+          <div className="bg-[var(--bg-subtle)] rounded p-3">
+            <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-semibold">Total Amount</p>
+            <p className="tabular-lg text-lg text-[var(--text-primary)]">{fmtMoney(caseReport.total_amount)}</p>
           </div>
-          <div className="bg-gray-50 rounded p-3">
-            <p className="text-xs text-gray-500 uppercase tracking-wide">Pattern</p>
-            <p className="font-bold text-lg text-gray-900 capitalize">{caseReport.pattern_type.replace('_', ' ')}</p>
+          <div className="bg-[var(--bg-subtle)] rounded p-3">
+            <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-semibold">Pattern</p>
+            <p className="text-lg font-bold text-[var(--text-primary)] capitalize">{caseReport.pattern_type.replace('_', ' ')}</p>
           </div>
         </div>
-
-        {/* Timeline */}
         <div>
-          <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">Timeline</p>
+          <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-semibold mb-2">Timeline</p>
           <div className="space-y-2">
             {caseReport.timeline.map((entry, i) => (
               <div key={i} className="flex items-start gap-3 text-sm">
-                <div className="flex-shrink-0 w-12 text-xs font-mono text-gray-500 pt-0.5">
-                  step {entry.step}
-                </div>
+                <div className="flex-shrink-0 w-14 text-xs font-mono text-[var(--text-muted)] pt-0.5 tabular">step {entry.step}</div>
                 <div className="flex-1">
-                  <p className="text-gray-800">{entry.event}</p>
-                  <p className="text-xs text-gray-500">
-                    <span className="font-mono">{entry.account_id}</span> · {fmtMoney(entry.amount)}
+                  <p className="text-[var(--text-primary)]">{entry.event}</p>
+                  <p className="text-xs text-[var(--text-muted)]">
+                    <span className="font-mono">{entry.account_id}</span>
+                    <span className="ml-1">·</span>
+                    <span className="ml-1 tabular">{fmtMoney(entry.amount)}</span>
                   </p>
                 </div>
               </div>
             ))}
           </div>
         </div>
-
-        {/* Parties */}
         <div>
-          <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">Parties Involved</p>
+          <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-semibold mb-2">Parties Involved</p>
           <div className="flex flex-wrap gap-2">
             {caseReport.parties.map((party, i) => (
-              <div key={i} className="bg-gray-100 rounded px-3 py-1.5 text-xs">
-                <span className="font-mono font-semibold">{party.account_id}</span>
-                <span className="text-gray-500 ml-1">· {party.role}</span>
-                <span className="text-gray-700 ml-1">· {fmtMoney(party.total_amount)}</span>
+              <div key={i} className="bg-[var(--bg-subtle)] rounded px-3 py-1.5 text-xs">
+                <span className="font-mono font-semibold text-[var(--text-primary)]">{party.account_id}</span>
+                <span className="text-[var(--text-muted)] ml-1">· {party.role}</span>
+                <span className="text-[var(--text-secondary)] ml-1">·</span>
+                <span className="ml-1 tabular text-[var(--text-secondary)]">{fmtMoney(party.total_amount)}</span>
               </div>
             ))}
           </div>
         </div>
-
-        {/* SAR fields */}
-        <div className="border-t border-gray-200 pt-3">
-          <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">SAR Fields</p>
+        <div className="border-t border-[var(--border-default)] pt-3">
+          <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-semibold mb-2">SAR Fields</p>
           <div className="space-y-1 text-sm">
-            <div>
-              <span className="text-gray-500">Filing reason:</span>{' '}
-              <span className="text-gray-800">{caseReport.sar_fields.filing_reason}</span>
-            </div>
-            <div>
-              <span className="text-gray-500">Activity type:</span>{' '}
-              <span className="text-gray-800">{caseReport.sar_fields.suspicious_activity_type}</span>
-            </div>
+            <div><span className="text-[var(--text-muted)]">Filing reason:</span> <span className="text-[var(--text-primary)]">{caseReport.sar_fields.filing_reason}</span></div>
+            <div><span className="text-[var(--text-muted)]">Activity type:</span> <span className="text-[var(--text-primary)]">{caseReport.sar_fields.suspicious_activity_type}</span></div>
           </div>
         </div>
       </div>
