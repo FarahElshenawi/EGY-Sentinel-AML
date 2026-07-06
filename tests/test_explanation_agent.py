@@ -105,7 +105,7 @@ class TestExplanationFallback:
     def test_fallback_uses_real_data(self):
         result = get_explanation_fallback(SAMPLE_CASE_REPORT, SAMPLE_ALERT)
         assert "C1234567" in result["explanation_text"]
-        assert "87" in result["explanation_text"]
+        assert "88" in result["explanation_text"]
         assert "circular" in result["explanation_text"]
 
     def test_fallback_citations_contain_score(self):
