@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.env
+.venv/
+venv/
+node_modules/
+.next/
+data/sample/*.csv
+data/llm_cache/
+models/*.joblib
+.DS_Store
+*.log
