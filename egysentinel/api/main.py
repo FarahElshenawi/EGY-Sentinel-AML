@@ -126,48 +126,47 @@ async def detect_patterns():
 @app.post("/score", response_model=ScoreResponse, tags=["scoring"])
 async def score_account(req: ScoreRequest):
     """
-    Compute risk score for an account.
+    Compute the combined risk score (rule + ML) for an account.
 
-    STUB LOGIC — REMOVE ENTIRELY ON DAY 4
-    When DS-1/3 delivers combine.py, replace this entire function body with:
-        from egysentinel.score.combine import combine_score
-        account = combine_score(req.account_id)
-        return ScoreResponse(account=account)
+    Uses the hybrid formula from DS-1/3's notebook:
+        final = 0.5 * rule_score + 0.5 * ml_prob * 100
+
+    Falls back to rule-only if the ML model can't be loaded.
     """
-    # TODO Day 4: REMOVE THIS STUB — replace with real combine_score()
-    if req.account_id.startswith("C"):
-        return ScoreResponse(account=Account(account_id=req.account_id, risk_score=78.0, risk_band=RiskBand.HIGH, pattern_count=1))
-    else:
-        return ScoreResponse(account=Account(account_id=req.account_id, risk_score=15.0, risk_band=RiskBand.LOW, pattern_count=0))
+    from egysentinel.score.combine import combine_account
+    from data.loader import load_sample
+    try:
+        df = load_sample()
+    except FileNotFoundError:
+        # No demo data loaded — return low score
+        return ScoreResponse(account=Account(
+            account_id=req.account_id, risk_score=0.0, risk_band=RiskBand.LOW, pattern_count=0,
+        ))
+    result = combine_account(req.account_id, df)
+    return ScoreResponse(account=Account(
+        account_id=result["account_id"],
+        risk_score=result["risk_score"],
+        risk_band=RiskBand(result["risk_band"]),
+        pattern_count=result["pattern_count"],
+    ))
 
 @app.post("/investigate", response_model=InvestigateResponse, tags=["agents"])
 async def investigate(req: InvestigateRequest):
     """
     Run the full agent pipeline on an account.
 
-    STUB LOGIC — REMOVE ENTIRELY ON DAY 5
-    When AI-1 delivers orchestrator.py, replace this entire function body with:
-        from egysentinel.agents.orchestrator import investigate as real_investigate
-        return real_investigate(req.account_id)
+    Chains: alert (AI-2) -> case (AI-3) -> explanation (AI-4)
+    All agents use rule-based fallbacks (no GLM SDK installed locally).
     """
-    # TODO Day 5: REMOVE THIS STUB
-    now = datetime.utcnow()
-    account_id = req.account_id
-
-    if not account_id.startswith("C") and account_id not in ["A", "B", "C", "D"]:
-        raise HTTPException(status_code=404, detail=f"Account {account_id} not found or not high-risk (stub data).")
-
-    alert = Alert(account_id=account_id, risk_score=85.0, risk_band=RiskBand.HIGH, pattern_type=PatternType.CIRCULAR, priority=AlertPriority.HIGH, summary=f"High-risk circular transaction pattern detected for account {account_id}", recommended_action="investigate", timestamp=now)
-    case = CaseReport(case_id=f"STUB-CASE-{account_id}", account_id=account_id, alert_id=f"STUB-ALERT-{account_id}", timeline=[TimelineEntry(step=100, event="Transfer to B", account_id="B", amount=450000), TimelineEntry(step=102, event="Transfer to C (from B)", account_id="C", amount=440000), TimelineEntry(step=104, event="Transfer to D (from C)", account_id="D", amount=430000), TimelineEntry(step=106, event="Transfer back to A (from D)", account_id="A", amount=420000)], parties=[Party(account_id="A", role=PartyRole.SUBJECT, total_amount=870000), Party(account_id="B", role=PartyRole.INTERMEDIARY, total_amount=890000), Party(account_id="C", role=PartyRole.INTERMEDIARY, total_amount=870000), Party(account_id="D", role=PartyRole.INTERMEDIARY, total_amount=850000)], total_amount=1740000, pattern_type=PatternType.CIRCULAR, narrative=f"Account {account_id} is the subject of a circular transaction pattern involving accounts A, B, C, and D. Funds totaling approximately 1.74 million were transferred in a closed loop over 6 hours (steps 100-106), with each transfer slightly smaller than the last (classic layering signature). This pattern is consistent with money laundering layering activity.", sar_fields=SARFields(filing_reason="Suspected layering via circular transactions", suspicious_activity_type="structuring", reporting_institution="EGY-Sentinel AML (capstone)", subject_info=f"Account {account_id}"), generated_at=now)
-    explanation = Explanation(case_id=case.case_id, explanation_text=f"Account {account_id} has been flagged as high-risk due to a circular transaction pattern involving four accounts (A, B, C, D). The total amount of 1.74 million transferred in a closed loop over 6 hours is a classic money-laundering layering signature. The risk score of 85/100 reflects both the pattern detection and the unusual transaction amounts. We recommend immediate investigation and potential filing of a Suspicious Activity Report.", citations=[Citation(type=CitationType.PATTERN, value="Circular transaction A->B->C->D->A"), Citation(type=CitationType.ANOMALY, value="Total amount 1.74M in 6 hours"), Citation(type=CitationType.SCORE, value="Risk score 85/100 (high band)")], confidence=0.87, generated_at=now)
-
-    return InvestigateResponse(alert=alert, case=case, explanation=explanation)
+    from egysentinel.agents.orchestrator import investigate_response
+    return investigate_response(req.account_id)
 
 @app.post("/case", response_model=CaseResponse, tags=["agents"])
-async def build_case(req: CaseRequest):
-    """Build a case report only. STUB — REMOVE ON DAY 5."""
-    invest_response = await investigate(InvestigateRequest(account_id=req.account_id))
-    return CaseResponse(case=invest_response.case)
+async def build_case_endpoint(req: CaseRequest):
+    """Build a case report only (no alert, no explanation)."""
+    from egysentinel.agents.orchestrator import investigate_response
+    resp = investigate_response(req.account_id)
+    return CaseResponse(case=resp.case)
 
 @app.get("/", tags=["system"])
 async def root():
