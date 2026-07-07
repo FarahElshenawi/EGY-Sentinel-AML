@@ -62,66 +62,48 @@ async def get_graph():
     """
     Get graph data (nodes + edges) for frontend visualization.
     Returns ONLY flagged accounts + their 1-hop neighbors.
-    NOT the full 30K node graph (that would crash the browser).
-
-    STUB — returns a small synthetic graph for now.
-    Day 2: replace with call to DS-2's build_digraph + detect_all + subgraph extraction.
+    NOT the full graph (that would crash the browser).
     """
-    # TODO Day 2: replace with real subgraph extraction
-    # from data.loader import load_sample
-    # from egysentinel.graph.build import build_digraph
-    # from egysentinel.graph.serialize import serialize_graph
-    # from egysentinel.detect import detect_all
-    # df = load_sample()
-    # G = build_digraph(df)
-    # patterns = detect_all(G)
-    # flagged_accounts = set()
-    # for p in patterns:
-    #     flagged_accounts.update(p.get("accounts", []))
-    # neighbors = set()
-    # for acc in flagged_accounts:
-    #     neighbors.update(G.neighbors(acc))
-    # subgraph_nodes = flagged_accounts | neighbors
-    # subgraph = G.subgraph(subgraph_nodes)
-    # return serialize_graph(subgraph)
+    from data.loader import load_sample
+    from egysentinel.graph.build import build_digraph, get_flagged_subgraph
+    from egysentinel.graph.serialize import serialize_graph
+    from egysentinel.detect import detect_all, get_flagged_accounts
 
-    nodes = [
-        GraphNode(id="A", label="Account A", risk_score=85, risk_band=RiskBand.HIGH),
-        GraphNode(id="B", label="Account B", risk_score=72, risk_band=RiskBand.HIGH),
-        GraphNode(id="C", label="Account C", risk_score=68, risk_band=RiskBand.HIGH),
-        GraphNode(id="D", label="Account D", risk_score=91, risk_band=RiskBand.HIGH),
-        GraphNode(id="E", label="Account E", risk_score=15, risk_band=RiskBand.LOW),
-    ]
-    edges = [
-        GraphEdge(source="A", target="B", amount=450000, type=TransactionType.TRANSFER, step=100, isFraud=1),
-        GraphEdge(source="B", target="C", amount=440000, type=TransactionType.TRANSFER, step=102, isFraud=1),
-        GraphEdge(source="C", target="D", amount=430000, type=TransactionType.TRANSFER, step=104, isFraud=1),
-        GraphEdge(source="D", target="A", amount=420000, type=TransactionType.TRANSFER, step=106, isFraud=1),
-        GraphEdge(source="E", target="A", amount=5000, type=TransactionType.PAYMENT, step=50, isFraud=0),
-    ]
-    return GraphResponse(nodes=nodes, edges=edges, stats={"node_count": len(nodes), "edge_count": len(edges), "note": "STUB — real subgraph wired on Day 2"})
+    try:
+        df = load_sample()
+    except FileNotFoundError:
+        return GraphResponse(nodes=[], edges=[], stats={"error": "No demo data loaded"})
+
+    G = build_digraph(df)
+    patterns = detect_all(G)
+    flagged = get_flagged_accounts(patterns)
+    subgraph = get_flagged_subgraph(G, flagged, hops=1)
+
+    return serialize_graph(subgraph)
 
 @app.post("/detect", response_model=DetectResponse, tags=["detection"])
 async def detect_patterns():
     """
-    Run pattern detectors on the loaded sample.
-    No payload needed — operates on server-side data.
-
-    STUB — returns one fake circular pattern.
-    Day 3: replace with call to DS-2's detect_all(graph).
+    Run all 3 pattern detectors (circular, fan_out, dense_cluster)
+    on the loaded demo data.
     """
-    # TODO Day 3: replace with real detector call
-    # from data.loader import load_sample
-    # from egysentinel.graph.build import build_digraph
-    # from egysentinel.detect import detect_all
-    # df = load_sample()
-    # graph = build_digraph(df)
-    # patterns = detect_all(graph)
-    # accounts_flagged = list(set(acc for p in patterns for acc in p.get("accounts", [])))
-    # return DetectResponse(patterns=patterns, total_patterns=len(patterns), accounts_flagged=accounts_flagged)
+    from data.loader import load_sample
+    from egysentinel.graph.build import build_digraph
+    from egysentinel.detect import detect_all, get_flagged_accounts
 
-    fake_pattern = {"type": "circular", "accounts": ["A", "B", "C", "D"], "edges": [{"source": "A", "target": "B", "amount": 450000}, {"source": "B", "target": "C", "amount": 440000}, {"source": "C", "target": "D", "amount": 430000}, {"source": "D", "target": "A", "amount": 420000}], "description": "STUB: Circular transaction pattern A->B->C->D->A"}
-    return DetectResponse(patterns=[fake_pattern], total_patterns=1, accounts_flagged=["A", "B", "C", "D"])
+    try:
+        df = load_sample()
+    except FileNotFoundError:
+        return DetectResponse(patterns=[], total_patterns=0, accounts_flagged=[])
+
+    G = build_digraph(df)
+    patterns = detect_all(G)
+    accounts_flagged = sorted(get_flagged_accounts(patterns))
+    return DetectResponse(
+        patterns=patterns,
+        total_patterns=len(patterns),
+        accounts_flagged=accounts_flagged,
+    )
 
 @app.post("/score", response_model=ScoreResponse, tags=["scoring"])
 async def score_account(req: ScoreRequest):
