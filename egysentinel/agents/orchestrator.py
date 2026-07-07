@@ -149,7 +149,7 @@ def investigate(
     pattern_type: Optional[str] = None,
     total_amount: Optional[float] = None,
     llm_client: Any = None,
-    use_glm: bool = False,
+    use_glm: bool = True,
 ) -> dict[str, Any]:
     """Run the full agent pipeline on an account.
 
@@ -171,10 +171,13 @@ def investigate(
                       If None, defaults to "none".
         total_amount: Sum of involved transactions. If None, computed
                       from transactions_df.
-        llm_client: Optional LLMClient with .complete() method. If None,
-                    all agents use their rule-based fallbacks.
-        use_glm: Whether to attempt GLM calls (default False — we ship
-                 in fallback-only mode since GLM SDK is not installed).
+        llm_client: Optional LLMClient with .complete() method. If None
+                    and use_glm=True, attempts to auto-create one from
+                    OPENROUTER_API_KEY env var. If that fails, falls
+                    back to rule-based mode for all agents.
+        use_glm: Whether to attempt LLM calls (default True). If True
+                 and no llm_client is provided, will try to create one
+                 from env vars. Set to False to force fallback-only mode.
 
     Returns:
         Dict with three keys: "alert", "case", "explanation".
@@ -182,6 +185,17 @@ def investigate(
         Always returns schema-valid output — never raises.
     """
     start_time = datetime.now(timezone.utc)
+
+    # Auto-create LLM client if requested but not provided
+    if use_glm and llm_client is None:
+        try:
+            from egysentinel.agents.llm_client import get_llm_client
+            llm_client = get_llm_client(allow_no_key=True)
+            if llm_client is None:
+                use_glm = False  # no API key available — fall back
+        except Exception as e:
+            logger.warning(f"Could not initialize LLM client: {e}. Using fallbacks.")
+            use_glm = False
 
     # 1. Load transactions if not provided
     if transactions_df is None:

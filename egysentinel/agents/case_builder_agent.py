@@ -344,12 +344,18 @@ logger = logging.getLogger(__name__)
 _PROMPT_PATH = Path(__file__).parent / "prompts" / "case_builder.txt"
 
 # Try to import AI-1's llm_client; if not available, use z-ai CLI fallback
+# The LLMClient requires OPENROUTER_API_KEY env var — if missing, fall back
+# gracefully (the build_case() function will use build_case_stub instead).
 _llm_client_available = False
+_llm_client = None
 try:
-    from egysentinel.agents.llm_client import LLMClient
-    _llm_client = LLMClient()
-    _llm_client_available = True
-    logger.info("AI-1 llm_client loaded — using it for GLM calls")
+    from egysentinel.agents.llm_client import get_llm_client
+    _llm_client = get_llm_client(allow_no_key=True)
+    if _llm_client is not None:
+        _llm_client_available = True
+        logger.info("AI-1 llm_client loaded — using it for LLM calls")
+    else:
+        logger.info("No OPENROUTER_API_KEY set — case builder will use stub fallback")
 except ImportError:
     logger.info("AI-1 llm_client not found — using z-ai CLI fallback")
 
