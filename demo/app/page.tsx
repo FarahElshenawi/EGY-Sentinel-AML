@@ -11,10 +11,9 @@ export default function LandingPage() {
     <div className="lp-root">
       <Hero mounted={mounted} />
       <ProblemSection />
-      <SolutionSection />
-      <PipelineSection />
+      <HowItWorksSection />
+      <TrustSection />
       <DemoSection />
-      <TechSection />
       <Footer />
     </div>
   );
@@ -51,11 +50,11 @@ function Hero({ mounted }: { mounted: boolean }) {
       <div className={`lp-hero-content ${mounted ? 'lp-visible' : ''}`}>
         <div className="lp-logo-wrapper"><Logo size={120} className="lp-logo" /></div>
         <h1 className="lp-hero-title"><span className="lp-gradient-text">SENTINEL AML</span></h1>
-        <p className="lp-hero-tagline">Uncover the Hidden. Protect the System.</p>
-        <p className="lp-hero-sub">AI-Powered Financial Surveillance that detects what traditional systems miss.</p>
+        <p className="lp-hero-tagline">See the money move before it disappears.</p>
+        <p className="lp-hero-sub">Sentinel watches every transaction moving through your bank and hands your investigators a clear, evidence-backed case the moment something looks wrong — no spreadsheets, no guesswork.</p>
         <div className="lp-hero-ctas">
-          <Link href="/dashboard" className="lp-btn-primary">🚀 Launch Live Demo</Link>
-          <a href="#solution" className="lp-btn-secondary">View Architecture</a>
+          <Link href="/cases" className="lp-btn-primary">Open the Investigator Console</Link>
+          <a href="#how-it-works" className="lp-btn-secondary">See how it works</a>
         </div>
         <div className="lp-scroll-hint"><span>Scroll to explore</span><span className="lp-scroll-arrow">↓</span></div>
       </div>
@@ -66,17 +65,17 @@ function Hero({ mounted }: { mounted: boolean }) {
 function ProblemSection() {
   const { ref, visible } = useScrollReveal();
   const stats = [
-    { icon: '💰', value: '$2.1T', label: 'Laundered annually worldwide', source: 'UNODC estimate' },
-    { icon: '🕸️', value: '99%', label: 'Of fraud goes undetected by rule-based systems', source: 'Industry benchmark' },
-    { icon: '📉', value: '6.3M', label: 'Transactions in PaySim dataset — only 0.13% flagged as fraud', source: 'PaySim synthetic data' },
+    { icon: '💰', value: '$2.1T', label: 'Moved through the financial system by launderers every year', source: 'UNODC estimate' },
+    { icon: '🕸️', value: '99%', label: 'Of that activity slips past checklist-based screening', source: 'Industry benchmark' },
+    { icon: '⏱️', value: 'Minutes', label: 'Is how long it takes Sentinel to turn a hunch into a filed case', source: 'Typical investigation time' },
   ];
   return (
     <section className="lp-section lp-dark" ref={ref}>
       <FloatingNodes density={25} />
       <div className={`lp-container ${visible ? 'lp-visible' : ''}`}>
         <h2 className="lp-section-title">The Hidden Threat</h2>
-        <p className="lp-section-lead">Fraud is no longer visible. It lives inside networks.</p>
-        <p className="lp-section-body">Traditional rule-based systems catch the obvious — single high-value transfers, known bad actors, simple thresholds. They miss the circular flows, the layering patterns, the dense clusters that money launderers build to obscure their tracks. By the time a human investigator spots the pattern, the money is gone.</p>
+        <p className="lp-section-lead">Fraud doesn&apos;t look like fraud. It looks like a normal day.</p>
+        <p className="lp-section-body">Money launderers don&apos;t trip a single alarm — they spread funds across a web of accounts, moving them in loops and small bursts that stay just under the radar. Checklists and dollar thresholds miss that shape entirely. By the time a person notices the pattern by hand, the money is long gone.</p>
         <div className="lp-stat-grid">
           {stats.map((stat, i) => (
             <div key={i} className="lp-stat-card" style={{ animationDelay: `${i * 100}ms` }}>
@@ -92,27 +91,45 @@ function ProblemSection() {
   );
 }
 
-function SolutionSection() {
+function HowItWorksSection() {
   const { ref, visible } = useScrollReveal();
-  const pillars = [
-    { icon: '🔗', title: 'Graph Intelligence', color: '#2563EB', description: 'Model transactions as a directed graph. Detect patterns that rules cannot — circular flows, fan-out smurfing, and dense clusters built to obscure money trails.', points: ['Circular transaction detection', 'Fan-out / fan-in analysis', 'Louvain community clustering'] },
-    { icon: '🎯', title: 'ML Risk Scoring', color: '#0A2B5C', description: 'Combine a rule-based ensemble with XGBoost to rank every account on a 0–100 risk scale. Calibrated for class imbalance — catches the 0.13% that matter.', points: ['Rule ensemble (5 signals)', 'XGBoost classification', 'Combined final risk score'] },
-    { icon: '🤖', title: 'Agentic Investigation', color: '#FFA500', description: 'Three GLM-powered AI agents build the full investigation — alert, case report, and plain-English explanation — with citations and confidence scores. No black box.', points: ['Alert Agent (priority + summary)', 'Case Builder (SAR-style report)', 'Explanation Agent (cited justification)'] },
+  const steps = [
+    {
+      num: 1,
+      title: 'Sentinel watches every transfer',
+      description: 'Every transaction that moves through your bank is mapped as it happens — who sent it, who received it, and how it connects to everything else.',
+      icon: '👁️',
+      color: '#2563EB',
+    },
+    {
+      num: 2,
+      title: 'It flags what a person would miss',
+      description: 'Sentinel spots the shapes that matter — money looping back to where it started, one account fanning out to dozens of others, tight clusters moving funds among themselves.',
+      icon: '🎯',
+      color: '#0A2B5C',
+    },
+    {
+      num: 3,
+      title: 'Your investigator gets the full story',
+      description: 'No dashboards to decode. Just a plain-English case file: what happened, why it matters, and the exact evidence behind every claim — ready to escalate or file.',
+      icon: '📋',
+      color: '#FFA500',
+    },
   ];
   return (
-    <section id="solution" className="lp-section lp-light" ref={ref}>
+    <section id="how-it-works" className="lp-section lp-light" ref={ref}>
       <div className={`lp-container ${visible ? 'lp-visible' : ''}`}>
-        <h2 className="lp-section-title lp-dark-text">Our Vision</h2>
-        <p className="lp-section-lead lp-dark-text">Transforming Detection into Intelligence</p>
+        <h2 className="lp-section-title lp-dark-text">How It Works</h2>
+        <p className="lp-section-lead lp-dark-text">From raw activity to a case your team can act on — in three steps</p>
         <div className="lp-pillar-grid">
-          {pillars.map((pillar, i) => (
-            <div key={i} className="lp-pillar-card" style={{ borderTopColor: pillar.color, animationDelay: `${i * 150}ms` }}>
-              <div className="lp-pillar-icon" style={{ color: pillar.color }}>{pillar.icon}</div>
-              <h3 className="lp-pillar-title" style={{ color: pillar.color }}>{pillar.title}</h3>
-              <p className="lp-pillar-desc">{pillar.description}</p>
-              <ul className="lp-pillar-points">
-                {pillar.points.map((point, j) => (<li key={j} style={{ color: pillar.color }}><span className="lp-pillar-bullet" style={{ color: pillar.color }}>▸</span><span className="lp-dark-text">{point}</span></li>))}
-              </ul>
+          {steps.map((step, i) => (
+            <div key={i} className="lp-pillar-card" style={{ borderTopColor: step.color, animationDelay: `${i * 150}ms` }}>
+              <div className="flex items-center gap-3 mb-3">
+                <div className="lp-pillar-icon" style={{ color: step.color, marginBottom: 0 }}>{step.icon}</div>
+                <span className="text-xs font-mono font-bold" style={{ color: step.color }}>STEP {step.num}</span>
+              </div>
+              <h3 className="lp-pillar-title" style={{ color: step.color }}>{step.title}</h3>
+              <p className="lp-pillar-desc">{step.description}</p>
             </div>
           ))}
         </div>
@@ -121,33 +138,28 @@ function SolutionSection() {
   );
 }
 
-function PipelineSection() {
+function TrustSection() {
   const { ref, visible } = useScrollReveal();
-  const stages = [
-    { num: 1, label: 'DATA', desc: 'PaySim 30K sample', color: '#2563EB' },
-    { num: 2, label: 'GRAPH', desc: 'NetworkX DiGraph', color: '#2563EB' },
-    { num: 3, label: 'PATTERNS', desc: '3 detectors', color: '#0A2B5C' },
-    { num: 4, label: 'RISK', desc: 'Rule + XGBoost', color: '#0A2B5C' },
-    { num: 5, label: 'AGENTS', desc: '3 GLM agents', color: '#FFA500' },
-    { num: 6, label: 'UI', desc: 'Live dashboard', color: '#FFA500' },
+  const points = [
+    { icon: '✅', title: 'Every claim has a source', desc: 'Investigators can click any statement in a case to see the exact transactions behind it.' },
+    { icon: '🔒', title: 'Nothing happens quietly', desc: 'Every action — a view, an escalation, a filing — is recorded to an audit trail your compliance team can hand to a regulator.' },
+    { icon: '🧑\u200d⚖️', title: 'People stay in control', desc: 'Sentinel builds the case. Your investigators make the call — escalate, close, or file, always with a reason on record.' },
   ];
   return (
     <section className="lp-section lp-dark" ref={ref}>
-      <FloatingNodes density={15} />
+      <FloatingNodes density={12} />
       <div className={`lp-container ${visible ? 'lp-visible' : ''}`}>
-        <h2 className="lp-section-title">How It Works</h2>
-        <p className="lp-section-lead">From raw data to actionable intelligence</p>
-        <div className="lp-pipeline">
-          {stages.map((stage, i) => (
-            <div key={i} className="lp-pipeline-stage">
-              <div className="lp-pipeline-badge" style={{ backgroundColor: stage.color }}>{stage.num}</div>
-              <p className="lp-pipeline-label">{stage.label}</p>
-              <p className="lp-pipeline-desc">{stage.desc}</p>
-              {i < stages.length - 1 && <div className="lp-pipeline-arrow">→</div>}
+        <h2 className="lp-section-title">Built for Scrutiny</h2>
+        <p className="lp-section-lead">Explainable by design — not a black box you have to trust blindly</p>
+        <div className="lp-pillar-grid">
+          {points.map((p, i) => (
+            <div key={i} className="lp-pillar-card" style={{ background: 'rgba(255,255,255,0.03)', borderTop: 'none', borderLeft: '3px solid #FFA500', animationDelay: `${i * 120}ms` }}>
+              <div className="lp-pillar-icon">{p.icon}</div>
+              <h3 className="lp-pillar-title" style={{ color: '#F3F4F6' }}>{p.title}</h3>
+              <p className="lp-pillar-desc" style={{ color: '#9CA3AF' }}>{p.desc}</p>
             </div>
           ))}
         </div>
-        <p className="lp-pipeline-tagline">6 stages. 10 days. Zero compromise.</p>
       </div>
     </section>
   );
@@ -159,19 +171,19 @@ function DemoSection() {
     <section className="lp-section lp-light" ref={ref}>
       <div className={`lp-container ${visible ? 'lp-visible' : ''}`}>
         <h2 className="lp-section-title lp-dark-text">See It In Action</h2>
-        <p className="lp-section-lead lp-dark-text">Interactive demo — no signup required</p>
+        <p className="lp-section-lead lp-dark-text">Walk through a real investigation — no signup required</p>
         <div className="lp-demo-frame">
           <div className="lp-demo-browser-bar">
             <div className="lp-demo-dots"><span></span><span></span><span></span></div>
-            <div className="lp-demo-url">localhost:3000/dashboard</div>
+            <div className="lp-demo-url">sentinel-aml.com/cases</div>
           </div>
           <div className="lp-demo-content">
             <div className="lp-demo-kpis">
-              <div className="lp-demo-kpi"><span className="lp-demo-kpi-val">1</span><span className="lp-demo-kpi-lbl">CRITICAL</span></div>
+              <div className="lp-demo-kpi"><span className="lp-demo-kpi-val">1</span><span className="lp-demo-kpi-lbl">NEEDS REVIEW</span></div>
               <div className="lp-demo-kpi"><span className="lp-demo-kpi-val">$1.74M</span><span className="lp-demo-kpi-lbl">FLAGGED</span></div>
-              <div className="lp-demo-kpi"><span className="lp-demo-kpi-val">87%</span><span className="lp-demo-kpi-lbl">PRECISION</span></div>
-              <div className="lp-demo-kpi"><span className="lp-demo-kpi-val">0.04</span><span className="lp-demo-kpi-lbl">DRIFT</span></div>
-              <div className="lp-demo-kpi"><span className="lp-demo-kpi-val">1,204</span><span className="lp-demo-kpi-lbl">TXN/S</span></div>
+              <div className="lp-demo-kpi"><span className="lp-demo-kpi-val">87%</span><span className="lp-demo-kpi-lbl">ACCURACY</span></div>
+              <div className="lp-demo-kpi"><span className="lp-demo-kpi-val">4</span><span className="lp-demo-kpi-lbl">OPEN CASES</span></div>
+              <div className="lp-demo-kpi"><span className="lp-demo-kpi-val">1,204</span><span className="lp-demo-kpi-lbl">TXN REVIEWED/S</span></div>
             </div>
             <div className="lp-demo-panels">
               <div className="lp-demo-graph">
@@ -187,37 +199,18 @@ function DemoSection() {
                 </svg>
               </div>
               <div className="lp-demo-side">
-                <div className="lp-demo-agent lp-demo-agent-1">🚨 Alert Agent · HIGH</div>
-                <div className="lp-demo-agent lp-demo-agent-2">📋 Case Builder · CASE-0231</div>
-                <div className="lp-demo-agent lp-demo-agent-3">💡 Explanation · 87% conf</div>
+                <div className="lp-demo-agent lp-demo-agent-1">🔎 Pattern found · Money loops back to sender</div>
+                <div className="lp-demo-agent lp-demo-agent-2">📋 Case file ready · CASE-0231</div>
+                <div className="lp-demo-agent lp-demo-agent-3">💡 Explained in plain English · 87% confident</div>
               </div>
             </div>
           </div>
         </div>
-        <div className="lp-demo-cta"><Link href="/dashboard" className="lp-btn-primary lp-btn-lg">🚀 Launch Live Demo →</Link></div>
+        <div className="lp-demo-cta"><Link href="/cases" className="lp-btn-primary lp-btn-lg">Open the Investigator Console →</Link></div>
         <div className="lp-demo-features">
-          <span>📊 Interactive graph — click any node</span>
-          <span>🤖 Watch 3 AI agents build the case in real-time</span>
-          <span>📜 Full audit trail with expandable payloads</span>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function TechSection() {
-  const { ref, visible } = useScrollReveal();
-  const techs = ['Python', 'FastAPI', 'NetworkX', 'XGBoost', 'scikit-learn', 'GLM (z-ai SDK)', 'Next.js 16', 'React 19', 'TypeScript', 'Tailwind CSS', 'Docker', 'Pandas', 'Pydantic', 'JupyterLab'];
-  return (
-    <section className="lp-section lp-dark" ref={ref}>
-      <div className={`lp-container ${visible ? 'lp-visible' : ''}`}>
-        <h2 className="lp-section-title">Built With</h2>
-        <p className="lp-section-lead">100% Free Stack · No API keys · No cloud costs</p>
-        <div className="lp-tech-grid">
-          {techs.map((tech, i) => (<div key={i} className="lp-tech-badge" style={{ animationDelay: `${i * 50}ms` }}>{tech}</div>))}
-        </div>
-        <div className="lp-tech-note">
-          <p>Every tool in this stack is open-source or free-tier. GLM is accessed via the <code className="lp-code">z-ai-web-dev-sdk</code> — no API key, no credit card, no usage limits. Total project cost: <strong>$0</strong>.</p>
+          <span>📊 Explore the money trail visually</span>
+          <span>📖 Read a clear, sourced explanation for every flag</span>
+          <span>📜 Hand auditors a complete record on request</span>
         </div>
       </div>
     </section>
@@ -231,8 +224,8 @@ function Footer() {
         <Logo size={56} className="lp-footer-logo" />
         <div className="lp-footer-text">
           <p className="lp-footer-brand">SENTINEL AML</p>
-          <p className="lp-footer-tagline">Uncover the Hidden. Protect the System.</p>
-          <p className="lp-footer-meta">Capstone Project · 2026 · Built by 7 engineers in 10 days</p>
+          <p className="lp-footer-tagline">See the money move before it disappears.</p>
+          <p className="lp-footer-meta">Built for bank investigators, compliance teams, and the people they answer to.</p>
         </div>
       </div>
     </footer>

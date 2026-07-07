@@ -38,9 +38,9 @@ export default function AlertsPage() {
     <div className="p-6">
       {/* Page Header */}
       <div className="mb-6">
-        <h1 className="font-serif text-2xl font-bold text-[var(--text-primary)] mb-1">Alert Center</h1>
+        <h1 className="font-serif text-2xl font-bold text-[var(--text-primary)] mb-1">Alert Inbox</h1>
         <p className="text-sm text-[var(--text-muted)]">
-          Inbox of active alerts. Click to open investigation workspace.
+          Things that need a look. Open one to start the investigation.
         </p>
       </div>
 
@@ -98,10 +98,10 @@ export default function AlertsPage() {
                 <td className={`px-4 py-3 text-xs font-medium ${statusColors[alert.status]}`}>{alert.status}</td>
                 <td className="px-4 py-3 text-right">
                   <Link
-                    href="/dashboard"
+                    href={`/cases/${alert.account}`}
                     className="text-xs text-[var(--brand-primary)] hover:underline font-medium"
                   >
-                    Investigate →
+                    Open case →
                   </Link>
                 </td>
               </tr>

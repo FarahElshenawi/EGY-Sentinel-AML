@@ -9,8 +9,8 @@ const jetbrains = JetBrains_Mono({ subsets: ['latin'], variable: '--font-mono' }
 const sourceSerif = Source_Serif_4({ subsets: ['latin'], variable: '--font-serif' });
 
 export const metadata: Metadata = {
-  title: 'EGY-Sentinel AML — Financial Intelligence',
-  description: 'AI-Powered Financial Surveillance & Fraud Intelligence System',
+  title: 'Sentinel AML — Financial Investigation Console',
+  description: 'A clear, evidence-backed investigation workspace for bank fraud teams.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -21,8 +21,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     >
       <body className="font-sans antialiased bg-[var(--bg-app)] text-[var(--text-primary)] min-h-screen">
         <Sidebar />
-        {/* Main content offset by sidebar width (60px) */}
-        <div className="ml-[60px]">{children}</div>
+        {/* Main content offset by sidebar width (64px) */}
+        <div className="ml-[64px]">{children}</div>
       </body>
     </html>
   );
