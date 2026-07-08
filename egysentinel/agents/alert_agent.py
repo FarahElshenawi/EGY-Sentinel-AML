@@ -41,13 +41,22 @@ def generate_alert(account_id: str, risk_score: float, risk_band: str,
 
 
 def get_alert_fallback(account_id: str, risk_score: float, pattern_type: str) -> dict:
+    """Rule-based fallback for alert priority.
+
+    Priority is driven by the RISK SCORE, not the pattern type.
+    A circular pattern with score 50 is medium priority — not critical.
+    The pattern type informs the summary text, not the priority level.
+    """
     if pattern_type == "circular_flow":
         pattern_type = "circular"
-    if risk_score >= 80 or pattern_type == "circular":
-        return {"priority": "critical", "summary": f"[RULE-BASED] Account {account_id} flagged with score {risk_score:.0f} and {pattern_type} pattern.", "recommended_action": "freeze"}
-    elif risk_score >= 60 or pattern_type in ["fan_out", "fan_in"]:
-        return {"priority": "high", "summary": f"[RULE-BASED] Account {account_id} flagged with score {risk_score:.0f} and {pattern_type} pattern.", "recommended_action": "escalate"}
-    elif risk_score >= 40:
-        return {"priority": "medium", "summary": f"[RULE-BASED] Account {account_id} flagged with score {risk_score:.0f}.", "recommended_action": "investigate"}
+
+    pattern_desc = f" with {pattern_type} pattern" if pattern_type != "none" else ""
+
+    if risk_score >= 85:
+        return {"priority": "critical", "summary": f"Account {account_id} flagged with risk score {risk_score:.0f}/100{pattern_desc}. Immediate action required.", "recommended_action": "freeze"}
+    elif risk_score >= 66:
+        return {"priority": "high", "summary": f"Account {account_id} flagged with risk score {risk_score:.0f}/100{pattern_desc}. Investigation recommended.", "recommended_action": "escalate"}
+    elif risk_score >= 31:
+        return {"priority": "medium", "summary": f"Account {account_id} flagged with risk score {risk_score:.0f}/100{pattern_desc}. Review recommended.", "recommended_action": "investigate"}
     else:
-        return {"priority": "low", "summary": f"[RULE-BASED] Account {account_id} has low risk score {risk_score:.0f}.", "recommended_action": "monitor"}
+        return {"priority": "low", "summary": f"Account {account_id} has low risk score {risk_score:.0f}/100.", "recommended_action": "monitor"}

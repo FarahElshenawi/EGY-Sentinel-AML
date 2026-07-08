@@ -89,20 +89,45 @@ def generate_explanation(case_report: dict, alert: dict, llm_client=None) -> dic
 
 
 def get_explanation_fallback(case_report: dict, alert: dict) -> dict:
-    """Rule-based fallback when LLM fails."""
+    """Rule-based fallback when LLM fails.
+
+    The explanation text matches the ACTUAL risk level — not a generic
+    "high probability" statement. A score of 50 says "moderate probability",
+    not "high probability".
+    """
     case_id = case_report.get("case_id", "UNKNOWN")
     account_id = alert.get("account_id", case_report.get("account_id", "UNKNOWN"))
     risk_score = alert.get("risk_score", 0)
+    risk_band = alert.get("risk_band", "medium")
     pattern_type = alert.get("pattern_type", "unknown")
     total_amount = case_report.get("total_amount", 0)
     priority = alert.get("priority", "medium")
 
+    # Match the probability language to the actual risk band
+    if risk_band == "high":
+        prob_desc = "a high probability of money laundering activity"
+        action_desc = "warrants immediate investigation"
+    elif risk_band == "medium":
+        prob_desc = "a moderate probability of suspicious activity"
+        action_desc = "warrants review by a compliance officer"
+    else:
+        prob_desc = "a low probability of suspicious activity"
+        action_desc = "has been flagged for monitoring"
+
+    # Pattern-specific explanation
+    pattern_explain = {
+        "circular": "Funds were transferred in a closed loop between multiple accounts before returning to the originator — a classic layering signature.",
+        "fan_out": "Funds were rapidly disbursed to multiple receiving accounts in a short time window, consistent with structuring or smurfing.",
+        "dense_cluster": "A tightly interconnected group of accounts transacted heavily among themselves, indicating coordinated activity.",
+        "none": "The account crossed the risk score threshold based on transaction characteristics.",
+    }.get(pattern_type, "The account exhibited suspicious transaction patterns.")
+
     explanation_text = (
-        f"Account {account_id} has been flagged with a risk score of {risk_score:.0f}/100, "
-        f"indicating a high probability of money laundering activity. "
+        f"Account {account_id} has been flagged with a risk score of {risk_score:.0f}/100 "
+        f"({risk_band} band), indicating {prob_desc}. "
         f"A {pattern_type} transaction pattern was detected involving a total amount of "
-        f"${total_amount:,.2f}. The alert was classified as {priority} priority, "
-        f"warranting immediate investigation by compliance officers."
+        f"${total_amount:,.2f}. {pattern_explain} "
+        f"The alert was classified as {priority} priority, {action_desc}."
     )
 
     citations = [

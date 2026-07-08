@@ -1,68 +1,24 @@
 /**
  * Investigation Queue — the app homepage.
- * Answers "what should I investigate first?" in one glance.
+ *
+ * Uses /api/v1/cases which returns the REAL risk score from
+ * combine_account() — not the detector's pattern confidence.
+ * This ensures the score shown here matches /investigate.
  */
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { api, ApiError } from '@/lib/api';
-import type { DetectResponse, PatternType } from '@/types';
+import { api, ApiError, type CaseSummary, type CasesSummaryResponse } from '@/lib/api';
 import TopBar from '@/components/organisms/TopBar';
 import CaseRow from '@/components/molecules/CaseRow';
 import FilterChip from '@/components/molecules/FilterChip';
 import Spinner from '@/components/atoms/Spinner';
 
-interface CaseItem {
-  id: string;
-  patternType: PatternType;
-  patternLabel: string;
-  riskScore: number;
-  riskBand: 'low' | 'medium' | 'high';
-  description: string;
-  accountsInPattern: number;
-}
-
-function bandFromScore(score: number): 'low' | 'medium' | 'high' {
-  if (score >= 66) return 'high';
-  if (score >= 31) return 'medium';
-  return 'low';
-}
-
-function patternLabel(detector: string): string {
-  switch (detector) {
-    case 'circular': return 'Circular';
-    case 'fan_out': return 'Fan-Out';
-    case 'dense_cluster': return 'Dense Cluster';
-    default: return 'None';
-  }
-}
-
-function buildCases(data: DetectResponse): CaseItem[] {
-  const accountMap = new Map<string, CaseItem>();
-  for (const p of data.patterns) {
-    const score = Math.round((p.score_raw || 0) * 100);
-    for (const acc of p.accounts) {
-      const existing = accountMap.get(acc);
-      if (!existing || score > existing.riskScore) {
-        accountMap.set(acc, {
-          id: acc,
-          patternType: p.detector,
-          patternLabel: patternLabel(p.detector),
-          riskScore: score,
-          riskBand: bandFromScore(score),
-          description: p.evidence?.description || `${patternLabel(p.detector)} pattern detected`,
-          accountsInPattern: p.accounts.length,
-        });
-      }
-    }
-  }
-  return Array.from(accountMap.values()).sort((a, b) => b.riskScore - a.riskScore);
-}
-
-type FilterType = 'all' | PatternType;
+type FilterType = 'all' | 'circular' | 'fan_out' | 'dense_cluster';
 
 export default function QueuePage() {
-  const [cases, setCases] = useState<CaseItem[]>([]);
+  const [cases, setCases] = useState<CaseSummary[]>([]);
+  const [stats, setStats] = useState<CasesSummaryResponse['stats'] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterType>('all');
@@ -71,8 +27,12 @@ export default function QueuePage() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    api.detect()
-      .then((data) => { if (!cancelled) setCases(buildCases(data)); })
+    api.getCases()
+      .then((data) => {
+        if (cancelled) return;
+        setCases(data.cases);
+        setStats(data.stats);
+      })
       .catch((err) => {
         if (!cancelled) setError(err instanceof ApiError ? err.message : 'Could not load cases.');
       })
@@ -82,19 +42,10 @@ export default function QueuePage() {
 
   const filtered = useMemo(() => {
     let result = cases;
-    if (filter !== 'all') result = result.filter((c) => c.patternType === filter);
-    if (search.trim()) result = result.filter((c) => c.id.toLowerCase().includes(search.trim().toLowerCase()));
+    if (filter !== 'all') result = result.filter((c) => c.pattern_type === filter);
+    if (search.trim()) result = result.filter((c) => c.account_id.toLowerCase().includes(search.trim().toLowerCase()));
     return result;
   }, [cases, filter, search]);
-
-  const counts = useMemo(() => ({
-    all: cases.length,
-    circular: cases.filter((c) => c.patternType === 'circular').length,
-    fan_out: cases.filter((c) => c.patternType === 'fan_out').length,
-    dense_cluster: cases.filter((c) => c.patternType === 'dense_cluster').length,
-    critical: cases.filter((c) => c.riskScore >= 85).length,
-    high: cases.filter((c) => c.riskScore >= 66 && c.riskScore < 85).length,
-  }), [cases]);
 
   return (
     <>
@@ -112,24 +63,24 @@ export default function QueuePage() {
         <div className="mb-6">
           <h2 className="text-[24px] font-semibold text-[var(--ink-primary)] mb-1">Cases</h2>
           <div className="flex gap-6 text-[13px] text-[var(--ink-secondary)]">
-            <span><strong className="tabular text-[var(--ink-primary)]">{cases.length}</strong> flagged accounts</span>
-            <span><strong className="tabular text-[var(--risk-critical)]">{counts.critical}</strong> critical</span>
-            <span><strong className="tabular text-[var(--risk-high)]">{counts.high}</strong> high risk</span>
+            <span><strong className="tabular text-[var(--ink-primary)]">{stats?.total_cases || 0}</strong> flagged accounts</span>
+            <span><strong className="tabular text-[var(--risk-critical)]">{stats?.critical || 0}</strong> critical</span>
+            <span><strong className="tabular text-[var(--risk-high)]">{stats?.high || 0}</strong> high risk</span>
           </div>
         </div>
 
         <div className="flex items-center gap-2 mb-4">
-          <FilterChip label="All" count={counts.all} active={filter === 'all'} onClick={() => setFilter('all')} />
-          <FilterChip label="Circular" count={counts.circular} active={filter === 'circular'} onClick={() => setFilter('circular')} />
-          <FilterChip label="Fan-Out" count={counts.fan_out} active={filter === 'fan_out'} onClick={() => setFilter('fan_out')} />
-          <FilterChip label="Dense Cluster" count={counts.dense_cluster} active={filter === 'dense_cluster'} onClick={() => setFilter('dense_cluster')} />
+          <FilterChip label="All" count={stats?.total_cases} active={filter === 'all'} onClick={() => setFilter('all')} />
+          <FilterChip label="Circular" count={stats?.circular} active={filter === 'circular'} onClick={() => setFilter('circular')} />
+          <FilterChip label="Fan-Out" count={stats?.fan_out} active={filter === 'fan_out'} onClick={() => setFilter('fan_out')} />
+          <FilterChip label="Dense Cluster" count={stats?.dense_cluster} active={filter === 'dense_cluster'} onClick={() => setFilter('dense_cluster')} />
         </div>
 
         {loading && (
           <div className="flex items-center justify-center h-48">
             <div className="text-center">
               <Spinner size={28} className="mx-auto mb-3" />
-              <p className="text-sm text-[var(--ink-muted)]">Scanning transactions for suspicious patterns…</p>
+              <p className="text-sm text-[var(--ink-muted)]">Loading cases…</p>
             </div>
           </div>
         )}
@@ -154,15 +105,15 @@ export default function QueuePage() {
           <div className="space-y-2">
             {filtered.map((c) => (
               <CaseRow
-                key={c.id}
-                id={c.id}
-                pattern={c.patternType}
-                patternLabel={c.patternLabel}
-                riskScore={c.riskScore}
-                riskBand={c.riskBand}
-                riskLevel={c.riskScore >= 85 ? 'critical' : c.riskScore >= 66 ? 'high' : c.riskScore >= 31 ? 'medium' : 'low'}
+                key={c.account_id}
+                id={c.account_id}
+                pattern={c.pattern_type as any}
+                patternLabel={c.pattern_label}
+                riskScore={c.risk_score}
+                riskBand={c.risk_band}
+                riskLevel={c.priority as any}
                 description={c.description}
-                accountsInPattern={c.accountsInPattern}
+                accountsInPattern={c.accounts_in_pattern}
               />
             ))}
           </div>

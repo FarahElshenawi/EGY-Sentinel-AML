@@ -1,70 +1,29 @@
 /**
  * Reports — compliance table view of all cases.
+ *
+ * Uses /api/v1/cases for consistent risk scores across all pages.
  */
 'use client';
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { api, ApiError } from '@/lib/api';
-import type { DetectResponse } from '@/types';
+import { api, ApiError, type CaseSummary } from '@/lib/api';
 import TopBar from '@/components/organisms/TopBar';
 import Badge from '@/components/atoms/Badge';
 import Spinner from '@/components/atoms/Spinner';
 import { fmtMoney } from '@/lib/format';
 
-interface ReportRow {
-  id: string;
-  patternLabel: string;
-  riskScore: number;
-  riskBand: 'low' | 'medium' | 'high';
-  accountsInPattern: number;
-  totalAmount: number;
-}
-
-function patternLabel(detector: string): string {
-  switch (detector) {
-    case 'circular': return 'Circular';
-    case 'fan_out': return 'Fan-Out';
-    case 'dense_cluster': return 'Dense Cluster';
-    default: return 'None';
-  }
-}
-
-function bandFromScore(score: number): 'low' | 'medium' | 'high' {
-  if (score >= 66) return 'high';
-  if (score >= 31) return 'medium';
-  return 'low';
-}
-
 export default function ReportsPage() {
-  const [reports, setReports] = useState<ReportRow[]>([]);
+  const [reports, setReports] = useState<CaseSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    api.detect()
-      .then((data: DetectResponse) => {
-        if (cancelled) return;
-        const map = new Map<string, ReportRow>();
-        for (const p of data.patterns) {
-          const score = Math.round((p.score_raw || 0) * 100);
-          for (const acc of p.accounts) {
-            const existing = map.get(acc);
-            if (!existing || score > existing.riskScore) {
-              map.set(acc, {
-                id: acc,
-                patternLabel: patternLabel(p.detector),
-                riskScore: score,
-                riskBand: bandFromScore(score),
-                accountsInPattern: p.accounts.length,
-                totalAmount: p.evidence?.total_amount || 0,
-              });
-            }
-          }
-        }
-        setReports(Array.from(map.values()).sort((a, b) => b.riskScore - a.riskScore));
+    api.getCases()
+      .then((data) => {
+        if (!cancelled) setReports(data.cases);
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof ApiError ? err.message : 'Could not load reports.');
@@ -113,14 +72,14 @@ export default function ReportsPage() {
               </thead>
               <tbody>
                 {reports.map((r) => (
-                  <tr key={r.id} className="border-b border-[var(--border)] hover:bg-[var(--bg-inset)] transition-colors">
-                    <td className="px-4 py-3 font-mono font-semibold text-[var(--ink-primary)]">{r.id}</td>
-                    <td className="px-4 py-3 text-[var(--ink-secondary)]">{r.patternLabel}</td>
-                    <td className="px-4 py-3"><Badge color={r.riskBand} size="xs">{r.riskBand} · {r.riskScore}</Badge></td>
-                    <td className="px-4 py-3 tabular text-[var(--ink-secondary)]">{r.accountsInPattern}</td>
-                    <td className="px-4 py-3 tabular text-[var(--ink-primary)]">{fmtMoney(r.totalAmount)}</td>
+                  <tr key={r.account_id} className="border-b border-[var(--border)] hover:bg-[var(--bg-inset)] transition-colors">
+                    <td className="px-4 py-3 font-mono font-semibold text-[var(--ink-primary)]">{r.account_id}</td>
+                    <td className="px-4 py-3 text-[var(--ink-secondary)]">{r.pattern_label}</td>
+                    <td className="px-4 py-3"><Badge color={r.risk_band} size="xs">{r.risk_band} · {r.risk_score}</Badge></td>
+                    <td className="px-4 py-3 tabular text-[var(--ink-secondary)]">{r.accounts_in_pattern}</td>
+                    <td className="px-4 py-3 tabular text-[var(--ink-primary)]">{fmtMoney(r.total_amount)}</td>
                     <td className="px-4 py-3 text-right">
-                      <Link href={`/app/cases/${r.id}`} className="text-[var(--brand-blue)] hover:underline text-[12px] font-medium">View →</Link>
+                      <Link href={`/app/cases/${r.account_id}`} className="text-[var(--brand-blue)] hover:underline text-[12px] font-medium">View →</Link>
                     </td>
                   </tr>
                 ))}

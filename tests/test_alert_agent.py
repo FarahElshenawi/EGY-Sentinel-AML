@@ -20,7 +20,8 @@ def test_critical_priority():
 def test_fallback():
     result = get_alert_fallback(account_id="C_FB", risk_score=85.0, pattern_type="circular")
     assert result["priority"] == "critical"
-    assert "[RULE-BASED]" in result["summary"]
+    assert "C_FB" in result["summary"]
+    assert "85" in result["summary"]
 
 if __name__ == "__main__":
     tests = [test_low_priority, test_high_priority, test_critical_priority, test_fallback]

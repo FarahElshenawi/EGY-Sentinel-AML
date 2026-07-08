@@ -56,6 +56,35 @@ export interface DecisionResponse {
   status: string;
 }
 
+// ─── Cases summary types ───
+export interface CaseSummary {
+  account_id: string;
+  pattern_type: string;
+  pattern_label: string;
+  risk_score: number;
+  risk_band: 'low' | 'medium' | 'high';
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  accounts_in_pattern: number;
+  total_amount: number;
+  description: string;
+}
+
+export interface CasesSummaryResponse {
+  cases: CaseSummary[];
+  total: number;
+  stats: {
+    total_cases: number;
+    critical: number;
+    high: number;
+    medium: number;
+    low: number;
+    circular: number;
+    fan_out: number;
+    dense_cluster: number;
+    [key: string]: number;
+  };
+}
+
 export const api = {
   health: () => fetchJson<HealthResponse>('/health'),
   getGraph: () => fetchJson<GraphResponse>('/graph'),
@@ -63,6 +92,10 @@ export const api = {
   score: (accountId: string) => fetchJson<{ account: Account }>('/score', { method: 'POST', body: JSON.stringify({ account_id: accountId }) }),
   investigate: (accountId: string) => fetchJson<InvestigateResponse>('/investigate', { method: 'POST', body: JSON.stringify({ account_id: accountId }) }),
   buildCase: (accountId: string, alertId?: string) => fetchJson<{ case: CaseReport }>('/case', { method: 'POST', body: JSON.stringify({ account_id: accountId, alert_id: alertId }) }),
+
+  // Cases summary — uses the REAL risk score from combine_account(),
+  // not the detector's pattern confidence score.
+  getCases: () => fetchJson<CasesSummaryResponse>('/api/v1/cases'),
 
   // Decisions — escalate, close, needs review, generate report
   recordDecision: (req: DecisionRequest) =>
