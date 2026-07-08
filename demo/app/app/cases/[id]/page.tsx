@@ -111,12 +111,7 @@ export default function CaseWorkspacePage() {
           </div>
         </div>
         <div className="ml-auto">
-          <DecisionPanel
-            onEscalate={() => {}}
-            onClose={() => {}}
-            onNeedsReview={() => {}}
-            onGenerateReport={() => {}}
-          />
+          <DecisionPanel caseId={caseReport.case_id} accountId={accountId} />
         </div>
       </div>
 

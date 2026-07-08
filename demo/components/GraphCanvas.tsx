@@ -150,7 +150,7 @@ function GraphCanvas({ data, onNodeClick, selectedNode }: GraphCanvasProps) {
     </div>`;
   }, [getNodeColor]);
 
-  // Zoom to fit with comfortable padding — wait for layout to settle
+  // Tune force layout for better spacing + zoom to fit
   useEffect(() => {
     if (fgRef.current && graphData.nodes.length > 0) {
       const fg = fgRef.current;
@@ -166,8 +166,8 @@ function GraphCanvas({ data, onNodeClick, selectedNode }: GraphCanvasProps) {
       const center = fg.d3Force('center');
       if (center) center.strength(0.03);
 
-      // Reheat the simulation so new forces take effect
-      fg.d3Reheat();
+      // Note: d3Reheat() is not available in all versions.
+      // The simulation auto-reheats when forces change via d3Force().
 
       // Multiple zoom attempts — force graph needs time to settle
       const zoomFit = () => fg.zoomToFit(400, 80);

@@ -21,7 +21,7 @@ from egysentinel.agents.pipeline import (
     batch_process_alerts,
     normalize_pattern_type,
 )
-from egysentinel.agents.case_builder_agent import validate_case_report, _case_counter
+from egysentinel.agents.case_builder_agent import validate_case_report
 from egysentinel.agents.evidence import assemble_evidence
 
 
@@ -30,12 +30,12 @@ from egysentinel.agents.evidence import assemble_evidence
 # ============================================================
 
 @pytest.fixture(autouse=True)
-def reset_case_counter():
-    """Reset the global case counter before each test."""
+def reset_case_id_cache():
+    """Clear the case ID cache before each test for deterministic results."""
     import egysentinel.agents.case_builder_agent as cb
-    cb._case_counter = 0
+    cb._case_id_cache.clear()
     yield
-    cb._case_counter = 0
+    cb._case_id_cache.clear()
 
 
 @pytest.fixture
@@ -137,17 +137,21 @@ class TestPatternNormalization:
     def test_structuring_maps_to_fan_out(self):
         assert normalize_pattern_type("structuring") == "fan_out"
 
-    def test_funneling_maps_to_fan_out(self):
-        # funneling was previously fan_in, but fan_in was cut — now maps to fan_out
-        assert normalize_pattern_type("funneling") == "fan_out"
+    def test_funneling_maps_to_none(self):
+        # funneling was previously fan_in (consolidation) — opposite of fan_out (smurfing).
+        # Mapping to fan_out would misclassify SAR type as "structuring" (wrong crime).
+        # Now maps to "none" to avoid misclassification.
+        assert normalize_pattern_type("funneling") == "none"
 
     def test_layering_maps_to_none(self):
         # layering was cut from scope — no canonical equivalent, maps to "none"
         assert normalize_pattern_type("layering") == "none"
 
-    def test_fan_in_maps_to_fan_out(self):
-        # fan_in was cut — its inverse (fan_out) is the closest valid pattern
-        assert normalize_pattern_type("fan_in") == "fan_out"
+    def test_fan_in_maps_to_none(self):
+        # fan_in (consolidation) is the OPPOSITE of fan_out (smurfing).
+        # Mapping fan_in → fan_out would produce SAR type "structuring" which is wrong.
+        # Map to "none" to avoid misclassification.
+        assert normalize_pattern_type("fan_in") == "none"
 
 
 # ============================================================

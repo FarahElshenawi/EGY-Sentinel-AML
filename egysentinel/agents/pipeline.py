@@ -40,11 +40,14 @@ _PATTERN_ALIASES: dict[str, str] = {
     "circular_flow": "circular",
     "circular": "circular",
     "fan_out": "fan_out",
-    "fan_in": "fan_out",          # inverse of fan_out — map to fan_out
+    "fan_in": "none",             # cut from scope — fan_in (consolidation) is the
+                                  # opposite of fan_out (smurfing). Mapping it to
+                                  # fan_out would misclassify SAR type as "structuring"
+                                  # which is the wrong crime. Map to "none" instead.
     "layering": "none",           # cut from scope — no canonical equivalent
     "dense_cluster": "dense_cluster",
     "structuring": "fan_out",
-    "funneling": "fan_out",       # was fan_in, now maps to fan_out
+    "funneling": "none",          # was fan_in — now maps to "none" (same rationale)
     "coordinated_activity": "dense_cluster",
     "unknown": None,              # Will be resolved from patterns.csv or fallback
 }

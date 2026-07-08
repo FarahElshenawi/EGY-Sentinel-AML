@@ -17,12 +17,40 @@ import json
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-# Case counter for generating sequential case IDs
-_case_counter = 0
+import hashlib
+
+# Case ID cache — deterministic per account_id.
+# Same account → same case ID (idempotent investigation).
+# Previously used a global mutable counter which was not thread-safe,
+# not reset per session, and produced a new case ID on every call.
+_case_id_cache: dict[str, str] = {}
 
 
-def _next_case_id() -> str:
-    """Generate a sequential case ID (e.g., CASE-000001)."""
+def _next_case_id(account_id: str | None = None) -> str:
+    """Generate a deterministic case ID.
+
+    If account_id is provided, the case ID is derived from a hash of the
+    account ID — so investigating the same account always produces the
+    same case ID. This is idempotent and thread-safe.
+
+    If account_id is None (legacy callers), falls back to a counter.
+
+    Args:
+        account_id: The account being investigated. Same account → same case ID.
+
+    Returns:
+        Case ID string like "CASE-A1B2C3" (hash-based) or "CASE-000001" (counter).
+    """
+    if account_id:
+        if account_id in _case_id_cache:
+            return _case_id_cache[account_id]
+        # Hash the account ID to get a stable 6-char hex suffix
+        h = hashlib.sha256(account_id.encode()).hexdigest()[:6].upper()
+        case_id = f"CASE-{h}"
+        _case_id_cache[account_id] = case_id
+        return case_id
+
+    # Legacy fallback — counter-based (not recommended for new code)
     global _case_counter
     _case_counter += 1
     return f"CASE-{_case_counter:06d}"
@@ -241,7 +269,7 @@ def build_case_stub(evidence: dict[str, Any]) -> dict[str, Any]:
 
     # 3. Build the case report
     case_report = {
-        "case_id": _next_case_id(),
+        "case_id": _next_case_id(evidence.get("account_id")),
         "account_id": evidence["account_id"],
         "alert_id": evidence["alert_id"],
         "timeline": timeline,
@@ -335,8 +363,6 @@ def validate_case_report(report: dict[str, Any]) -> list[str]:
 # ======================================================================
 
 import logging
-import subprocess
-import tempfile
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -371,92 +397,47 @@ def _load_system_prompt() -> str:
 
 
 def _call_glm(system_prompt: str, user_message: str, timeout: int = 60) -> str:
-    """Call GLM and return the raw response text.
+    """Call the LLM and return the raw response text.
 
-    Day 4: Tries AI-1's llm_client first (caching, retry, JSON schema validation).
-    Falls back to z-ai CLI if llm_client is not available.
+    Uses AI-1's llm_client (OpenRouter integration). If the llm_client
+    is not available (no OPENROUTER_API_KEY set), raises RuntimeError —
+    the caller (build_case) catches this and falls back to build_case_stub.
+
+    Note: The previous z-ai CLI subprocess fallback was removed — it was
+    dead code (z-ai-web-dev-sdk was dropped from requirements.txt) and
+    silently failed with FileNotFoundError. Now we fail fast and let
+    the caller handle the fallback cleanly.
 
     Args:
         system_prompt: The system prompt (case_builder.txt content).
         user_message: The evidence JSON as a string.
-        timeout: Max seconds to wait for GLM response.
+        timeout: Max seconds to wait for LLM response.
 
     Returns:
-        Raw text response from GLM.
+        Raw text response from the LLM.
 
     Raises:
-        RuntimeError: If GLM call fails or times out.
+        RuntimeError: If llm_client is not available or the call fails.
     """
-    # Path 1: AI-1's llm_client (preferred — has caching, retry, validation)
-    if _llm_client_available:
-        try:
-            logger.info("Calling GLM via AI-1 llm_client...")
-            response = _llm_client.generate(
-                system_prompt=system_prompt,
-                user_message=user_message,
-                timeout=timeout,
-            )
-            # llm_client returns the content string directly
-            if isinstance(response, dict):
-                return response.get("content", json.dumps(response))
-            return str(response)
-        except Exception as e:
-            logger.warning(f"llm_client failed, falling back to z-ai CLI: {e}")
-            # Fall through to CLI
+    if not _llm_client_available:
+        raise RuntimeError(
+            "No LLM client available. Set OPENROUTER_API_KEY env var to enable LLM calls, "
+            "or use build_case_stub() for rule-based fallback."
+        )
 
-    # Path 2: z-ai CLI (fallback)
     try:
-        # Use -o flag to write clean JSON to a temp file (avoids emoji prefixes)
-        output_file = tempfile.mktemp(suffix=".json")
-
-        try:
-            result = subprocess.run(
-                [
-                    "z-ai", "chat",
-                    "--prompt", user_message,
-                    "--system", system_prompt,
-                    "-o", output_file,
-                ],
-                capture_output=True,
-                text=True,
-                timeout=timeout,
-            )
-
-            if result.returncode != 0:
-                raise RuntimeError(
-                    f"z-ai CLI failed (exit {result.returncode}): {result.stderr[:500]}"
-                )
-
-            out_path = Path(output_file)
-            if not out_path.exists():
-                raise RuntimeError("z-ai CLI did not produce output file")
-
-            raw = out_path.read_text(encoding="utf-8").strip()
-
-            # Find the first '{' and parse from there (skip any prefix)
-            json_start = raw.find("{")
-            if json_start == -1:
-                raise ValueError(f"No JSON found in output: {raw[:200]}")
-
-            cli_output = json.loads(raw[json_start:])
-            content = cli_output["choices"][0]["message"]["content"]
-            return content
-
-        finally:
-            try:
-                Path(output_file).unlink(missing_ok=True)
-            except OSError:
-                pass
-
-    except subprocess.TimeoutExpired:
-        raise RuntimeError(
-            f"GLM call timed out after {timeout}s. "
-            f"Use build_case_stub() as fallback."
+        logger.info("Calling LLM via AI-1 llm_client...")
+        response = _llm_client.generate(
+            system_prompt=system_prompt,
+            user_message=user_message,
+            timeout=timeout,
         )
-    except FileNotFoundError:
-        raise RuntimeError(
-            "z-ai CLI not found. Ensure z-ai-web-dev-sdk is installed."
-        )
+        # llm_client returns the content string directly
+        if isinstance(response, dict):
+            return response.get("content", json.dumps(response))
+        return str(response)
+    except Exception as e:
+        raise RuntimeError(f"LLM call failed: {e}")
 
 
 def _extract_json_from_response(response_text: str) -> dict[str, Any]:
@@ -567,7 +548,7 @@ def _post_process_glm_report(
 
     # 2. Ensure case_id exists
     if "case_id" not in raw_report or not raw_report["case_id"]:
-        raw_report["case_id"] = _next_case_id()
+        raw_report["case_id"] = _next_case_id(evidence.get("account_id"))
 
     # 3. Ensure pattern_type matches evidence
     if evidence.get("pattern_type"):
@@ -711,7 +692,7 @@ def build_case_glm(
 
     # 2. Prepare user message (evidence as JSON)
     # Inject case_id so GLM uses it
-    case_id = _next_case_id()
+    case_id = _next_case_id(evidence.get("account_id"))
     evidence_with_id = {**evidence, "case_id": case_id}
     user_message = json.dumps(evidence_with_id, indent=2, ensure_ascii=False)
 

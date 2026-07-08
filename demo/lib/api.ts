@@ -32,14 +32,48 @@ async function fetchJson<T>(path: string, options?: RequestInit): Promise<T> {
   }
 }
 
+// ─── Decision types ───
+export type DecisionType = 'escalate' | 'close' | 'needs_review' | 'generate_report';
+
+export interface DecisionRequest {
+  case_id: string;
+  account_id: string;
+  decision: DecisionType;
+  reason: string;
+  detail?: string;
+  actor?: string;
+}
+
+export interface DecisionResponse {
+  id: string;
+  case_id: string;
+  account_id: string;
+  decision: string;
+  reason: string;
+  detail: string | null;
+  actor: string;
+  timestamp: string;
+  status: string;
+}
+
 export const api = {
   health: () => fetchJson<HealthResponse>('/health'),
   getGraph: () => fetchJson<GraphResponse>('/graph'),
-  // No payload needed — /detect operates on server-side loaded data
   detect: () => fetchJson<DetectResponse>('/detect', { method: 'POST' }),
   score: (accountId: string) => fetchJson<{ account: Account }>('/score', { method: 'POST', body: JSON.stringify({ account_id: accountId }) }),
   investigate: (accountId: string) => fetchJson<InvestigateResponse>('/investigate', { method: 'POST', body: JSON.stringify({ account_id: accountId }) }),
   buildCase: (accountId: string, alertId?: string) => fetchJson<{ case: CaseReport }>('/case', { method: 'POST', body: JSON.stringify({ account_id: accountId, alert_id: alertId }) }),
+
+  // Decisions — escalate, close, needs review, generate report
+  recordDecision: (req: DecisionRequest) =>
+    fetchJson<DecisionResponse>('/api/v1/cases/decide', {
+      method: 'POST',
+      body: JSON.stringify(req),
+    }),
+  getDecisions: (caseId?: string) =>
+    fetchJson<{ decisions: DecisionResponse[]; total: number }>(
+      `/api/v1/cases/decisions${caseId ? `?case_id=${encodeURIComponent(caseId)}` : ''}`
+    ),
 };
 
 export { ApiError };

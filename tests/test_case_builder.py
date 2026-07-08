@@ -242,10 +242,10 @@ class TestCaseBuilderStub:
             assert field in report, f"Missing required field: {field}"
 
     def test_stub_case_id_format(self, synthetic_evidence):
-        """Case IDs should follow CASE-XXXXXX format."""
+        """Case IDs should follow CASE-XXXXXX format (hash-based, 6 chars)."""
         report = build_case_stub(synthetic_evidence)
         assert report["case_id"].startswith("CASE-")
-        assert len(report["case_id"]) == 11  # CASE-000001
+        assert len(report["case_id"]) == 11  # CASE-XXXXXX (CASE- + 6 hex chars)
 
     def test_stub_account_id_matches_evidence(self, synthetic_evidence):
         """account_id in report must match evidence."""
@@ -346,14 +346,23 @@ class TestCaseBuilderStub:
         assert len(json_str) > 100
 
     def test_case_ids_are_sequential(self, synthetic_evidence):
-        """Each call should produce a new sequential case ID."""
+        """Case IDs are now deterministic per account_id (hash-based).
+        Same account → same case ID. Different accounts → different case IDs."""
         import egysentinel.agents.case_builder_agent as mod
-        mod._case_counter = 0
+        mod._case_id_cache.clear()
 
         r1 = build_case_stub(synthetic_evidence)
         r2 = build_case_stub(synthetic_evidence)
-        assert r1["case_id"] == "CASE-000001"
-        assert r2["case_id"] == "CASE-000002"
+        # Same account → same case ID (idempotent)
+        assert r1["case_id"] == r2["case_id"]
+        assert r1["case_id"].startswith("CASE-")
+        # Hash-based, 6-char hex suffix
+        assert len(r1["case_id"]) == 11  # CASE-XXXXXX
+
+        # Different account → different case ID
+        other_evidence = {**synthetic_evidence, "account_id": "C999999"}
+        r3 = build_case_stub(other_evidence)
+        assert r3["case_id"] != r1["case_id"]
 
 
 # ---------------------------------------------------------------------------

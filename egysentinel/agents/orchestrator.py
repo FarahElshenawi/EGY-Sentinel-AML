@@ -208,15 +208,52 @@ def investigate(
                 columns=["step", "type", "amount", "nameOrig", "nameDest", "isFraud"]
             )
 
-    # 2. Score the account if not provided
-    if risk_score is None or risk_band is None or pattern_type is None:
-        score, band, pattern = _stub_score_account(account_id, transactions_df, pattern_type)
-        if risk_score is None:
-            risk_score = score
-        if risk_band is None:
-            risk_band = band
-        if pattern_type is None:
-            pattern_type = pattern
+    # 2. Score the account using the REAL scoring pipeline (DS-1/3)
+    # Uses combine_account() from egysentinel.score.combine — the hybrid
+    # formula: 0.5 * rule_score + 0.5 * ml_prob * 100
+    # Falls back to stub scorer only if the real scorer fails.
+    if risk_score is None or risk_band is None:
+        try:
+            from egysentinel.score.combine import combine_account
+            score_result = combine_account(account_id, transactions_df, use_ml=True)
+            if risk_score is None:
+                risk_score = score_result["risk_score"]
+            if risk_band is None:
+                risk_band = score_result["risk_band"]
+            logger.info(
+                f"Real scorer: {account_id} | rule={score_result['rule_score']:.1f} | "
+                f"ml={score_result.get('ml_score', 'N/A')} | final={risk_score:.1f} | "
+                f"band={risk_band} | ml_used={score_result['ml_used']}"
+            )
+        except Exception as e:
+            logger.warning(
+                f"Real scorer failed for {account_id}: {e}. Falling back to stub."
+            )
+            score, band, _ = _stub_score_account(account_id, transactions_df, pattern_type)
+            if risk_score is None:
+                risk_score = score
+            if risk_band is None:
+                risk_band = band
+
+    # 2b. Detect pattern if not provided — runs real detectors (DS-2)
+    if pattern_type is None:
+        try:
+            from egysentinel.graph.build import build_digraph
+            from egysentinel.detect import detect_all, get_flagged_accounts
+            from data.loader import _ensure_patterns_cache
+            patterns_by_account = _ensure_patterns_cache(transactions_df)
+            account_patterns = patterns_by_account.get(account_id, [])
+            if account_patterns:
+                # Use the highest-scoring pattern for this account
+                best = max(account_patterns, key=lambda p: p.get("score_raw", 0))
+                pattern_type = best["detector"]
+                logger.info(f"Real detector: {account_id} → {pattern_type} (score={best['score_raw']:.2f})")
+            else:
+                pattern_type = "none"
+                logger.info(f"Real detector: {account_id} → no pattern detected")
+        except Exception as e:
+            logger.warning(f"Pattern detection failed for {account_id}: {e}. Using 'none'.")
+            pattern_type = "none"
 
     # Normalize pattern to locked enum
     pattern_type = normalize_pattern_type(pattern_type, fallback="none")
@@ -277,9 +314,11 @@ def investigate(
             risk_band=risk_band,
             patterns_csv="data/patterns.csv",  # optional — evidence.py handles missing
         )
-        # Override pattern_type from alert (locked enum)
-        if not evidence.get("pattern_type") or evidence["pattern_type"] is None:
-            evidence["pattern_type"] = pattern_type
+        # ALWAYS override pattern_type with the orchestrator's value.
+        # The orchestrator's pattern_type is authoritative — it comes from
+        # either the caller, the real detector, or normalization.
+        # Don't let evidence.py's patterns.csv lookup override it.
+        evidence["pattern_type"] = pattern_type
     except Exception as e:
         logger.error(f"Evidence assembly failed: {e}. Using minimal evidence.")
         evidence = {

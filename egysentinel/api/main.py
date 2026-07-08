@@ -53,6 +53,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Wire the decisions router (case escalation/close/review/report)
+from egysentinel.api.decisions import router as decisions_router
+app.include_router(decisions_router)
+
 @app.get("/health", response_model=HealthResponse, tags=["system"])
 async def health():
     return HealthResponse(status="ok", version="0.2.0", timestamp=datetime.utcnow())
