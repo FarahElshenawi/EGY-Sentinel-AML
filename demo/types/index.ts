@@ -1,7 +1,7 @@
 export type TransactionType = 'CASH_IN' | 'CASH_OUT' | 'DEBIT' | 'PAYMENT' | 'TRANSFER';
 export type RiskBand = 'low' | 'medium' | 'high';
 export type AlertPriority = 'low' | 'medium' | 'high' | 'critical';
-export type PatternType = 'circular' | 'fan_out' | 'fan_in' | 'layering' | 'dense_cluster' | 'none';
+export type PatternType = 'circular' | 'fan_out' | 'dense_cluster' | 'none';
 export type PartyRole = 'sender' | 'receiver' | 'intermediary' | 'subject';
 export type CitationType = 'pattern' | 'anomaly' | 'score' | 'transaction';
 

@@ -61,8 +61,9 @@ async def health():
 async def get_graph():
     """
     Get graph data (nodes + edges) for frontend visualization.
-    Returns ONLY flagged accounts + their 1-hop neighbors.
-    NOT the full graph (that would crash the browser).
+    Returns ONLY the top flagged accounts (by score) + their 1-hop neighbors.
+    Limits to top 15 flagged accounts to keep the graph readable —
+    showing all 48 flagged + neighbors creates an unreadable blob.
     """
     from data.loader import load_sample
     from egysentinel.graph.build import build_digraph, get_flagged_subgraph
@@ -76,9 +77,17 @@ async def get_graph():
 
     G = build_digraph(df)
     patterns = detect_all(G)
-    flagged = get_flagged_accounts(patterns)
-    subgraph = get_flagged_subgraph(G, flagged, hops=1)
 
+    # Sort patterns by score descending, take top accounts
+    patterns_sorted = sorted(patterns, key=lambda p: p.get("score_raw", 0), reverse=True)
+    top_flagged = set()
+    for p in patterns_sorted:
+        for acc in p.get("accounts", []):
+            top_flagged.add(acc)
+        if len(top_flagged) >= 15:  # Limit to top 15 flagged accounts
+            break
+
+    subgraph = get_flagged_subgraph(G, top_flagged, hops=1)
     return serialize_graph(subgraph)
 
 @app.post("/detect", response_model=DetectResponse, tags=["detection"])
