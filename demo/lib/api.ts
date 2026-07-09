@@ -97,6 +97,9 @@ export const api = {
   // not the detector's pattern confidence score.
   getCases: () => fetchJson<CasesSummaryResponse>('/api/v1/cases'),
 
+  // Graph for a specific account (case workspace) — account + 1-hop neighbors
+  getAccountGraph: (accountId: string) => fetchJson<GraphResponse>(`/graph/${accountId}`),
+
   // Decisions — escalate, close, needs review, generate report
   recordDecision: (req: DecisionRequest) =>
     fetchJson<DecisionResponse>('/api/v1/cases/decide', {

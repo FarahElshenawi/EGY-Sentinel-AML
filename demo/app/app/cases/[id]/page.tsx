@@ -30,6 +30,7 @@ export default function CaseWorkspacePage() {
 
   const [investigation, setInvestigation] = useState<InvestigateResponse | null>(null);
   const [graphData, setGraphData] = useState<GraphResponse | null>(null);
+  const [graphError, setGraphError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rightPane, setRightPane] = useState<RightPane>('graph');
@@ -38,9 +39,13 @@ export default function CaseWorkspacePage() {
     let cancelled = false;
     setLoading(true);
     setError(null);
+    setGraphError(null);
     Promise.all([
       api.investigate(accountId),
-      api.getGraph().catch(() => null),
+      api.getAccountGraph(accountId).catch((err) => {
+        if (!cancelled) setGraphError(err instanceof ApiError ? err.message : 'Could not load graph.');
+        return null;
+      }),
     ])
       .then(([investigationData, graphData]) => {
         if (cancelled) return;
@@ -111,7 +116,7 @@ export default function CaseWorkspacePage() {
           </div>
         </div>
         <div className="ml-auto">
-          <DecisionPanel caseId={caseReport.case_id} accountId={accountId} />
+          <DecisionPanel caseId={caseReport.case_id} accountId={accountId} investigation={investigation} />
         </div>
       </div>
 
@@ -262,9 +267,24 @@ export default function CaseWorkspacePage() {
             {rightPane === 'graph' && (
               <div className="h-full bg-[var(--bg-canvas)]">
                 {graphData ? (
-                  <GraphCanvas data={graphData} onNodeClick={() => {}} selectedNode={accountId} />
+                  <GraphCanvas
+                    data={graphData}
+                    onNodeClick={() => {}}
+                    selectedNode={accountId}
+                    patternMap={investigation ? new Map([[accountId, investigation.case.pattern_type]]) : null}
+                  />
                 ) : (
-                  <div className="flex items-center justify-center h-full text-[13px] text-[var(--ink-muted)]">Graph unavailable</div>
+                  <div className="flex items-center justify-center h-full text-center px-6">
+                    <div>
+                      <p className="text-[13px] font-semibold text-[var(--risk-critical)] mb-1">Graph unavailable</p>
+                      <p className="text-[11px] text-[var(--ink-muted)]">
+                        {graphError || 'Could not load the subgraph for this account.'}
+                      </p>
+                      <p className="text-[10px] text-[var(--ink-muted)] mt-2">
+                        Make sure the backend is restarted with the latest code.
+                      </p>
+                    </div>
+                  </div>
                 )}
               </div>
             )}

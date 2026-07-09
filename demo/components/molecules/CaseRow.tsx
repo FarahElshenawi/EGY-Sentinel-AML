@@ -56,7 +56,7 @@ export default function CaseRow({
           {patternLabel}
         </div>
         <div className="text-[12px] text-[var(--ink-muted)] flex-1 truncate">
-          {description} · {accountsInPattern} accounts
+          {description}
         </div>
         <Badge color={riskBand} size="sm" className="w-[72px] justify-center">
           {riskBand}

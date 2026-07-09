@@ -1,29 +1,27 @@
 /**
- * GraphCanvas — interactive transaction network graph.
+ * GraphCanvas — Interactive transaction network graph.
  *
- * UX decision (audit pain point #4): the graph is a verification tool,
- * not decoration. Nodes must be large enough to read at a glance —
- * account IDs are the primary information investigators need.
- *
- * Design choices:
- * - Nodes are 3x larger than before (16-28px radius based on risk)
- * - Labels are drawn ON the node, large and bold
- * - Selected node gets orange fill + thick ring
- * - High-risk nodes are navy filled with white text
- * - Edges show arrow direction + amount label on hover
- * - Zoom-to-fit with comfortable padding
+ * Redesigned for the "wow factor":
+ * - Full-screen canvas
+ * - Color-coded nodes (orange=selected, navy=high, slate=medium, gray=low/neighbor)
+ * - Edge thickness = transaction amount
+ * - Red edges only for fraud, slate for clean
+ * - Labels below nodes in JetBrains Mono with background pill
+ * - Fade non-connected nodes when one is selected
+ * - Force layout with collision detection
  */
 'use client';
 
-import { useRef, useEffect, useCallback, memo } from 'react';
+import { useRef, useEffect, useCallback, memo, useState, useMemo } from 'react';
 import dynamic from 'next/dynamic';
+import { forceCollide } from 'd3-force-3d';
 import type { GraphResponse } from '@/types';
 
 const ForceGraph2D = dynamic(() => import('react-force-graph-2d'), {
   ssr: false,
   loading: () => (
     <div className="flex items-center justify-center h-full text-[var(--ink-muted)] text-sm">
-      Loading graph library…
+      Loading graph…
     </div>
   ),
 });
@@ -32,13 +30,19 @@ interface GraphCanvasProps {
   data: GraphResponse;
   onNodeClick: (accountId: string) => void;
   selectedNode: string | null;
+  highlightedNodes?: Set<string> | null;
+  patternMap?: Map<string, string> | null;
 }
 
-function GraphCanvas({ data, onNodeClick, selectedNode }: GraphCanvasProps) {
+function GraphCanvas({ data, onNodeClick, selectedNode, highlightedNodes, patternMap }: GraphCanvasProps) {
   const fgRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [hoveredNode, setHoveredNode] = useState<string | null>(null);
 
-  const graphData = {
+  // Memoize graphData so it doesn't get recreated on every render.
+  // Without this, selecting a node causes a new graphData object,
+  // which makes ForceGraph2D restart the force simulation from scratch.
+  const graphData = useMemo(() => ({
     nodes: data.nodes.map((n) => ({
       id: n.id,
       label: n.label,
@@ -54,51 +58,79 @@ function GraphCanvas({ data, onNodeClick, selectedNode }: GraphCanvasProps) {
       step: e.step,
       isFraud: e.isFraud,
     })),
-  };
+  }), [data]);
 
-  // Node colors — design system palette
+  // Node colors — by PATTERN TYPE for visual distinction between clusters
   const getNodeColor = useCallback((node: any) => {
     if (node.id === selectedNode) return '#FFA500'; // orange — selected
-    switch (node.risk_band) {
-      case 'high': return '#0A2B5C';   // navy — high risk
-      case 'medium': return '#475569'; // slate — medium
-      case 'low': return '#94A3B8';    // muted — low
-      default: return '#C9BFA8';
+
+    // Color by pattern type if we have the map
+    const pattern = patternMap?.get(node.id);
+    if (pattern === 'circular') return '#0A2B5C';       // navy — circular
+    if (pattern === 'fan_out') return '#2563EB';         // blue — fan-out
+    if (pattern === 'dense_cluster') return '#7C3AED';   // purple — dense cluster
+
+    // Fallback: color by risk band for neighbors/unknown
+    if (node.risk_band === 'high') return '#0A2B5C';
+    if (node.risk_band === 'medium') return '#64748B';
+    return '#CBD5E1'; // light gray — low/neighbor
+  }, [selectedNode, patternMap]);
+
+  // Node radius — based on risk score, 12-18px
+  const getNodeRadius = useCallback((node: any) => {
+    const base = 12;
+    const riskBoost = (node.risk_score || 0) / 100 * 6;
+    return base + riskBoost;
+  }, []);
+
+  // Edge width — proportional to transaction amount
+  const getEdgeWidth = useCallback((link: any) => {
+    const min = 1;
+    const max = 6;
+    const logAmount = Math.log10(link.amount + 1);
+    const normalized = Math.min(1, logAmount / 7); // 7 = log10(10M)
+    return min + (max - min) * normalized;
+  }, []);
+
+  // Edge color — red ONLY for fraud, slate for clean
+  const getEdgeColor = useCallback((link: any) => {
+    if (link.isFraud) return '#DC2626';
+    return '#C9BFA8';
+  }, []);
+
+  // Determine if a node should be dimmed (when another is selected)
+  const isDimmed = useCallback((nodeId: string) => {
+    if (!selectedNode) return false;
+    if (nodeId === selectedNode) return false;
+    // Don't dim direct neighbors
+    const connected = new Set<string>();
+    for (const edge of data.edges) {
+      if (edge.source === selectedNode) connected.add(edge.target);
+      if (edge.target === selectedNode) connected.add(edge.source);
     }
-  }, [selectedNode]);
-
-  // Node size — MUCH larger than before. Base 18, scales up to 28 for high risk.
-  const getNodeSize = useCallback((node: any) => {
-    const riskSize = 16 + (node.risk_score || 0) / 12; // 16-24px from risk alone
-    const nodeEdges = data.edges.filter((e: any) => e.source === node.id || e.target === node.id);
-    const totalVolume = nodeEdges.reduce((sum: number, e: any) => sum + e.amount, 0);
-    const volumeBoost = Math.min(6, Math.log10(totalVolume + 1) / 1.5);
-    return Math.max(18, riskSize + volumeBoost); // minimum 18px radius
-  }, [data.edges]);
-
-  // Edge colors — red for fraud, warm gray for clean
-  const getEdgeColor = useCallback((link: any) => (link.isFraud ? '#DC2626' : '#C9BFA8'), []);
-  const getEdgeWidth = useCallback((link: any) => Math.max(1.5, Math.log10(link.amount + 1) / 1.5), []);
+    return !connected.has(nodeId);
+  }, [selectedNode, data.edges]);
 
   const nodeCanvasObject = useCallback((node: any, ctx: any, globalScale: number) => {
     const label = node.id;
-    const radius = getNodeSize(node);
+    const radius = getNodeRadius(node);
+    const color = getNodeColor(node);
+    const dimmed = isDimmed(node.id);
+    const opacity = dimmed ? 0.2 : 1;
 
-    // Font size scales with node — always readable
-    const fontSize = Math.max(9, radius * 0.55) / globalScale;
-    ctx.font = `700 ${fontSize}px 'JetBrains Mono', monospace`;
-    const textWidth = ctx.measureText(label).width;
-    const ballSize = Math.max(radius * 2, textWidth + 12 / globalScale);
+    ctx.globalAlpha = opacity;
 
     // Shadow for depth
-    ctx.shadowColor = 'rgba(10, 43, 92, 0.15)';
-    ctx.shadowBlur = 6 / globalScale;
-    ctx.shadowOffsetY = 2 / globalScale;
+    if (!dimmed) {
+      ctx.shadowColor = 'rgba(10, 43, 92, 0.2)';
+      ctx.shadowBlur = 6 / globalScale;
+      ctx.shadowOffsetY = 2 / globalScale;
+    }
 
-    // Fill
-    ctx.fillStyle = getNodeColor(node);
+    // Draw node
+    ctx.fillStyle = color;
     ctx.beginPath();
-    ctx.arc(node.x, node.y, ballSize / 2, 0, 2 * Math.PI);
+    ctx.arc(node.x, node.y, radius, 0, 2 * Math.PI);
     ctx.fill();
 
     // Reset shadow
@@ -106,80 +138,94 @@ function GraphCanvas({ data, onNodeClick, selectedNode }: GraphCanvasProps) {
     ctx.shadowBlur = 0;
     ctx.shadowOffsetY = 0;
 
-    // Selected ring — thick orange
+    // Selected ring — thick orange + outer glow
     if (node.id === selectedNode) {
       ctx.strokeStyle = '#FFA500';
       ctx.lineWidth = 4 / globalScale;
       ctx.stroke();
-      // Outer pulse ring
-      ctx.strokeStyle = 'rgba(255, 165, 0, 0.3)';
-      ctx.lineWidth = 2 / globalScale;
+      // Outer glow ring
+      ctx.strokeStyle = 'rgba(255, 165, 0, 0.2)';
+      ctx.lineWidth = 8 / globalScale;
       ctx.beginPath();
-      ctx.arc(node.x, node.y, ballSize / 2 + 6 / globalScale, 0, 2 * Math.PI);
+      ctx.arc(node.x, node.y, radius + 4 / globalScale, 0, 2 * Math.PI);
       ctx.stroke();
     }
 
-    // Label — white on dark nodes, navy on light nodes
-    const isLightNode = node.risk_band === 'low' || node.risk_band === 'medium';
-    const isSelected = node.id === selectedNode;
-    ctx.fillStyle = (isLightNode && !isSelected) ? '#0A2B5C' : '#FFFFFF';
+    // Label BELOW node — JetBrains Mono, high contrast
+    const fontSize = Math.max(10, 11 / globalScale);
+    ctx.font = `600 ${fontSize}px 'JetBrains Mono', monospace`;
+    const textWidth = ctx.measureText(label).width;
+    const pillW = textWidth + 10 / globalScale;
+    const pillH = fontSize + 4 / globalScale;
+    const pillY = node.y + radius + 4 / globalScale;
+
+    // Label background pill
+    ctx.fillStyle = dimmed ? 'rgba(247, 244, 237, 0.5)' : 'rgba(247, 244, 237, 0.95)';
+    ctx.beginPath();
+    ctx.roundRect(node.x - pillW / 2, pillY, pillW, pillH, 3 / globalScale);
+    ctx.fill();
+
+    // Label text
+    ctx.fillStyle = dimmed ? 'rgba(10, 43, 92, 0.3)' : '#0A2B5C';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(label, node.x, node.y);
-  }, [getNodeColor, getNodeSize, selectedNode]);
+    ctx.fillText(label, node.x, pillY + pillH / 2);
 
-  // Link label — shows amount on hover via tooltip
-  const linkLabel = useCallback((link: any) => {
-    const amount = link.amount >= 1000000
-      ? `$${(link.amount / 1000000).toFixed(1)}M`
-      : link.amount >= 1000
-      ? `$${(link.amount / 1000).toFixed(0)}K`
-      : `$${link.amount}`;
-    return `<div style="background:#FFFEFA;padding:6px 10px;border:1px solid #DDD6C6;border-radius:6px;font-size:11px;box-shadow:0 2px 8px rgba(10,43,92,0.08);color:#0A2B5C;font-family:'JetBrains Mono',monospace">
-      ${amount} ${link.isFraud ? '<span style="color:#DC2626">· fraud</span>' : ''}
-    </div>`;
-  }, []);
+    ctx.globalAlpha = 1;
+  }, [getNodeColor, getNodeRadius, selectedNode, isDimmed]);
+
+  // Dim edges that aren't connected to selected node
+  const getLinkColor = useCallback((link: any) => {
+    if (!selectedNode) {
+      return link.isFraud ? '#DC2626' : '#C9BFA8';
+    }
+    // Highlight edges connected to selected node
+    const isConnected = link.source.id === selectedNode || link.target.id === selectedNode ||
+                        link.source === selectedNode || link.target === selectedNode;
+    if (isConnected) {
+      return link.isFraud ? '#DC2626' : '#2A7FFF';
+    }
+    return 'rgba(201, 191, 168, 0.15)';
+  }, [selectedNode]);
+
+  const getLinkWidth = useCallback((link: any) => {
+    if (!selectedNode) return getEdgeWidth(link);
+    const isConnected = link.source.id === selectedNode || link.target.id === selectedNode ||
+                        link.source === selectedNode || link.target === selectedNode;
+    return isConnected ? getEdgeWidth(link) * 1.5 : getEdgeWidth(link) * 0.3;
+  }, [selectedNode, getEdgeWidth]);
 
   const nodeLabel = useCallback((node: any) => {
-    const color = getNodeColor(node);
-    const bandLabel = node.risk_band === 'high' ? 'High Risk' : node.risk_band === 'medium' ? 'Medium Risk' : 'Low Risk';
-    return `<div style="background:#FFFEFA;padding:10px 14px;border:1px solid #DDD6C6;border-radius:8px;font-size:13px;box-shadow:0 4px 12px rgba(10,43,92,0.12);color:#0A2B5C;font-family:'JetBrains Mono',monospace;min-width:140px">
-      <div style="font-weight:700;font-size:14px;margin-bottom:4px">${node.id}</div>
-      <div style="font-size:11px;color:#475569">Risk: <span style="color:${color};font-weight:600">${node.risk_score}/100</span></div>
-      <div style="font-size:11px;color:#475569">Band: <span style="color:${color};font-weight:600">${bandLabel}</span></div>
-    </div>`;
-  }, [getNodeColor]);
+    // Return empty — we use the side panel instead of tooltip
+    return '';
+  }, []);
 
-  // Tune force layout for better spacing + zoom to fit
+  // Force layout tuning
   useEffect(() => {
     if (fgRef.current && graphData.nodes.length > 0) {
       const fg = fgRef.current;
 
-      // Tune force layout for better spacing — spread nodes out
-      // Default charge is -30 which crams nodes together. -400 spreads them.
       const charge = fg.d3Force('charge');
-      if (charge) charge.strength(-400).distanceMax(400);
+      if (charge) charge.strength(-600).distanceMax(500);
 
       const link = fg.d3Force('link');
-      if (link) link.distance(70).strength(0.3);
+      if (link) link.distance(140).strength(0.2);
 
       const center = fg.d3Force('center');
-      if (center) center.strength(0.03);
+      if (center) center.strength(0.02);
 
-      // Note: d3Reheat() is not available in all versions.
-      // The simulation auto-reheats when forces change via d3Force().
+      fg.d3Force('collide', forceCollide((node: any) => {
+        const radius = getNodeRadius(node);
+        return radius + 30;
+      }).iterations(3));
 
-      // Multiple zoom attempts — force graph needs time to settle
-      const zoomFit = () => fg.zoomToFit(400, 80);
-      const t1 = setTimeout(zoomFit, 500);
-      const t2 = setTimeout(zoomFit, 1200);
-      const t3 = setTimeout(zoomFit, 2500);
+      const zoomFit = () => fg.zoomToFit(400, 100);
+      const t1 = setTimeout(zoomFit, 600);
+      const t2 = setTimeout(zoomFit, 1500);
+      const t3 = setTimeout(zoomFit, 3000);
       return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
     }
-  }, [graphData.nodes.length]);
-
-  // Note: react-force-graph-2d handles its own resizing via the height prop
-  // and the container's CSS. No manual resize logic needed.
+  }, [graphData.nodes.length, getNodeRadius]);
 
   return (
     <div ref={containerRef} className="w-full h-full relative">
@@ -188,19 +234,19 @@ function GraphCanvas({ data, onNodeClick, selectedNode }: GraphCanvasProps) {
         graphData={graphData}
         nodeCanvasObject={nodeCanvasObject}
         nodeCanvasObjectMode={() => 'after'}
-        nodeRelSize={18}
-        linkColor={getEdgeColor}
-        linkWidth={getEdgeWidth}
+        nodeRelSize={14}
+        linkColor={getLinkColor}
+        linkWidth={getLinkWidth}
         linkDirectionalArrowLength={6}
         linkDirectionalArrowRelPos={1}
-        linkDirectionalParticles={(link: any) => (link.isFraud ? 4 : 0)}
-        linkDirectionalParticleWidth={4}
+        linkDirectionalParticles={(link: any) => (link.isFraud ? 3 : 0)}
+        linkDirectionalParticleWidth={3}
         linkDirectionalParticleSpeed={0.006}
         linkDirectionalParticleColor={(link: any) => (link.isFraud ? '#DC2626' : '#C9BFA8')}
-        linkLabel={linkLabel}
         onNodeClick={(node: any) => onNodeClick(node.id)}
+        onNodeHover={(node: any) => setHoveredNode(node?.id || null)}
         nodeLabel={nodeLabel}
-        cooldownTicks={200}
+        cooldownTicks={300}
         enableZoomInteraction={true}
         enablePanInteraction={true}
         enableNodeDrag={true}
@@ -209,10 +255,6 @@ function GraphCanvas({ data, onNodeClick, selectedNode }: GraphCanvasProps) {
         minZoom={0.5}
         maxZoom={8}
       />
-      {/* Hint overlay */}
-      <div className="absolute bottom-3 left-3 text-[11px] text-[var(--ink-muted)] bg-[var(--bg-surface)] border border-[var(--border)] rounded-[var(--radius)] px-2.5 py-1.5 pointer-events-none">
-        Scroll to zoom · Drag to pan · Click node for details
-      </div>
     </div>
   );
 }

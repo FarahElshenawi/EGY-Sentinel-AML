@@ -79,16 +79,30 @@ async def get_cases_summary():
     patterns_by_account = _ensure_patterns_cache(df)
 
     # 2. For each flagged account, run the REAL risk scorer
+    # Filter: only show patterns with score_raw >= 0.3 (filters out background noise)
+    MIN_PATTERN_SCORE = 0.3
     cases: list[CaseSummary] = []
     seen_accounts: set[str] = set()
 
     for account_id, account_patterns in patterns_by_account.items():
         if account_id in seen_accounts:
             continue
+
+        # Filter out low-confidence patterns (background noise)
+        significant_patterns = [p for p in account_patterns if p.get("score_raw", 0) >= MIN_PATTERN_SCORE]
+        if not significant_patterns:
+            continue
+
         seen_accounts.add(account_id)
 
-        # Get the best (highest-scoring) pattern for this account
-        best_pattern = max(account_patterns, key=lambda p: p.get("score_raw", 0))
+        # Get the best pattern — prefer dense_cluster over circular when both exist,
+        # because circular detector finds cycles inside dense clusters too.
+        # This ensures dense cluster accounts show as "Dense Cluster" not "Circular".
+        cluster_patterns = [p for p in significant_patterns if p["detector"] == "dense_cluster"]
+        if cluster_patterns:
+            best_pattern = max(cluster_patterns, key=lambda p: p.get("score_raw", 0))
+        else:
+            best_pattern = max(significant_patterns, key=lambda p: p.get("score_raw", 0))
         pattern_type = best_pattern["detector"]
         accounts_in_pattern = len(best_pattern.get("accounts", []))
 

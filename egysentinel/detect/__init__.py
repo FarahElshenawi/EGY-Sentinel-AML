@@ -16,7 +16,7 @@ def detect_all(
     fan_out_threshold: int = 5,
     fan_out_ratio: float = 0.6,
     cluster_min_nodes: int = 4,
-    cluster_density: float = 0.5,
+    cluster_density: float = 0.3,
 ):
     """Run all 3 detectors and return a flattened list of patterns.
 

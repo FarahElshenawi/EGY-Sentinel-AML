@@ -69,9 +69,7 @@ async def health():
 async def get_graph():
     """
     Get graph data (nodes + edges) for frontend visualization.
-    Returns ONLY the top flagged accounts (by score) + their 1-hop neighbors.
-    Limits to top 15 flagged accounts to keep the graph readable —
-    showing all 48 flagged + neighbors creates an unreadable blob.
+    Returns ALL flagged accounts + their 1-hop neighbors.
     """
     from data.loader import load_sample
     from egysentinel.graph.build import build_digraph, get_flagged_subgraph
@@ -85,17 +83,9 @@ async def get_graph():
 
     G = build_digraph(df)
     patterns = detect_all(G)
+    all_flagged = get_flagged_accounts(patterns)
 
-    # Sort patterns by score descending, take top accounts
-    patterns_sorted = sorted(patterns, key=lambda p: p.get("score_raw", 0), reverse=True)
-    top_flagged = set()
-    for p in patterns_sorted:
-        for acc in p.get("accounts", []):
-            top_flagged.add(acc)
-        if len(top_flagged) >= 15:  # Limit to top 15 flagged accounts
-            break
-
-    subgraph = get_flagged_subgraph(G, top_flagged, hops=1)
+    subgraph = get_flagged_subgraph(G, all_flagged, hops=1)
     return serialize_graph(subgraph)
 
 @app.post("/detect", response_model=DetectResponse, tags=["detection"])
@@ -121,6 +111,26 @@ async def detect_patterns():
         total_patterns=len(patterns),
         accounts_flagged=accounts_flagged,
     )
+
+@app.get("/graph/{account_id}", response_model=GraphResponse, tags=["graph"])
+async def get_account_graph(account_id: str):
+    """
+    Get the subgraph for a SPECIFIC account — the account + its 1-hop neighbors.
+    Used by the Case Workspace right pane.
+    """
+    from data.loader import load_sample
+    from egysentinel.graph.build import build_digraph, get_account_subgraph
+    from egysentinel.graph.serialize import serialize_graph
+
+    try:
+        df = load_sample()
+    except FileNotFoundError:
+        return GraphResponse(nodes=[], edges=[], stats={"error": "No demo data loaded"})
+
+    G = build_digraph(df)
+    subgraph = get_account_subgraph(G, account_id, hops=1)
+
+    return serialize_graph(subgraph)
 
 @app.post("/score", response_model=ScoreResponse, tags=["scoring"])
 async def score_account(req: ScoreRequest):
