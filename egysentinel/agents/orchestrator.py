@@ -333,7 +333,7 @@ def investigate(
 
     # 5. AI-3: Build case
     try:
-        case = build_case(evidence, use_glm=use_glm, timeout=5)
+        case = build_case(evidence, use_glm=use_glm, timeout=300)
     except Exception as e:
         logger.error(f"Case builder failed: {e}. Using build_case_stub directly.")
         from egysentinel.agents.case_builder_agent import build_case_stub

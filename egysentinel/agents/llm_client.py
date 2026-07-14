@@ -55,7 +55,7 @@ logger = logging.getLogger(__name__)
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 DEFAULT_MODEL = os.environ.get(
     "OPENROUTER_MODEL",
-    "qwen/qwen3-next-80b-a3b-instruct:free",
+    "nousresearch/hermes-3-llama-3.1-405b:free",
 )
 DEFAULT_TIMEOUT = float(os.environ.get("OPENROUTER_TIMEOUT", "10"))
 DEFAULT_TEMPERATURE = 0.3  # low temp for deterministic structured output

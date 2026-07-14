@@ -10,7 +10,7 @@ networkx>=3.2
 neo4j>=5.18
 
 # ML
-scikit-learn>=1.4
+scikit-learn==1.6.1
 xgboost>=2.0
 
 # Service
