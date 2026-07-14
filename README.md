@@ -4,56 +4,62 @@
 
 > *See the money move before it disappears.*
 
-Sentinel AML is an anti-money-laundering platform that combines graph-based intelligence, machine learning risk scoring, and agentic AI investigation to detect financial crime that traditional rule-based systems miss — then hands your investigators a clear, evidence-backed case file the moment something looks wrong.
+Sentinel AML is an anti-money-laundering platform that combines graph-based intelligence, machine learning risk scoring, and large language models to detect financial crime that traditional rule-based systems miss — then hands your investigators a clear, evidence-backed case file the moment something looks wrong.
 
 ---
 
 ## What It Does
 
-Sentinel watches every transaction moving through a bank, maps it as a directed graph, and flags the shapes that matter: money looping back to where it started, one account fanning out to dozens of others, tight clusters moving funds among themselves. When a pattern fires, three AI agents build the full investigation — an alert with priority, a SAR-style case report, and a plain-English explanation with citations — so your investigator gets the whole story in one click, not a dashboard to decode.
+Sentinel watches every transaction moving through a bank, maps it as a directed graph, and flags the shapes that matter: money looping back to where it started, one account fanning out to dozens of others, tight clusters moving funds among themselves. When a pattern fires, the investigation pipeline builds the full case — an alert with priority, a SAR-style case report, and a plain-English explanation with citations — so your investigator gets the whole story in one click, not a dashboard to decode.
 
-### The 5-layer pipeline
+### The pipeline
 
 ```
-Demo Dataset (~200 rows, 5 planted patterns)
+Transactions (PaySim synthetic data — 206 rows, 5 planted patterns)
        |
        v
 +--------------------------------------------------+
-|  GRAPH LAYER (DS-2)                              |
-|  NetworkX DiGraph + 3 Detectors                  |
-|  - Circular (DFS simple_cycles, len 3-6)         |
-|  - Fan-out (out-degree >= 5 in 1-step window)    |
-|  - Dense Cluster (Louvain, density >= 0.5)       |
+|  PATTERN DETECTION                                |
+|  NetworkX DiGraph + 3 Detectors                   |
+|  - Circular (DFS simple_cycles, len 3-6)          |
+|  - Fan-out (out-degree >= 5 in 1-step window)     |
+|  - Dense Cluster (Louvain, density >= 0.3)        |
 +--------------------------+-----------------------+
                            v
 +--------------------------------------------------+
-|  ML LAYER (DS-1/3)                               |
-|  Rule Scorer (7 rules -> 0-100)                  |
-|  RandomForest (trained on 6.36M PaySim rows)     |
-|  Combine: 0.5 * rule + 0.5 * ml_prob * 100       |
+|  RISK ASSESSMENT                                  |
+|  Rule Scorer (7 rules -> 0-100, max aggregation)  |
+|  RandomForest (trained on 6.36M PaySim rows)      |
+|  Combine: 0.5 * rule + 0.5 * ml_prob * 100        |
 +--------------------------+-----------------------+
                            v
 +--------------------------------------------------+
-|  AGENTIC AI LAYER (AI-1/2/3/4)                   |
-|  LLM via OpenRouter free tier (Qwen3 Next 80B)   |
-|  1. Alert Agent -> priority + summary            |
-|  2. Case Builder -> SAR report + timeline        |
-|  3. Explanation -> plain-English + citations     |
-|  Fallback: rule-based templates if no API key    |
+|  INVESTIGATION BUILDER (Deterministic)            |
+|  Evidence collection, timeline, parties, SAR fields|
+|  Case ID: deterministic hash per account_id        |
 +--------------------------+-----------------------+
                            v
 +--------------------------------------------------+
-|  API LAYER (AI-5)                                |
-|  FastAPI + Pydantic validation                   |
-|  /health, /graph, /detect, /score, /investigate  |
+|  LLM SERVICES (Optional)                          |
+|  OpenRouter free tier (Qwen3 Next 80B)            |
+|  - Narrative generation                           |
+|  - Explanation with citations                     |
+|  - Alert summary (rule-based fallback)            |
+|  Fallback: rule-based templates if no API key     |
 +--------------------------+-----------------------+
                            v
 +--------------------------------------------------+
-|  UI LAYER (AI-5)                                 |
-|  Next.js 16 + React 19 + Tailwind CSS            |
-|  Dark command center + landing page              |
-|  3 pages: Dashboard, Alerts, Cases               |
-|  Case Workspace: Overview / Network / Audit tabs |
+|  API LAYER                                        |
+|  FastAPI + Pydantic validation                    |
+|  8 endpoints (see below)                          |
++--------------------------+-----------------------+
+                           v
++--------------------------------------------------+
+|  INVESTIGATOR WORKSPACE                           |
+|  Next.js 16 + React 19 + Tailwind CSS             |
+|  Light enterprise theme (ivory + navy + orange)   |
+|  Public website (7 pages) + App (5 pages)         |
+|  Two-pane case workspace + graph explorer          |
 +--------------------------------------------------+
 ```
 
@@ -112,15 +118,15 @@ The dashboard will be available at `http://localhost:3000`
 
 ### Using the Demo
 
-1. Open `http://localhost:3000` — you'll see the landing page
-2. Click **"Open the Investigator Console"** — goes to the Cases page
-3. The Cases page shows all flagged accounts from the demo dataset
-4. Click any case — opens the Case Workspace with 3 tabs:
-   - **Overview** — risk gauge, plain-English explanation, key facts, parties
-   - **Network Graph** — interactive transaction map
-   - **Audit Log & Raw Data** — full agent trace, audit trail, JSON dump
-5. Navigate via the sidebar: **Dashboard** (overview + map), **Alerts** (inbox), **Cases** (list)
-6. On the Dashboard, click "Load Sample" to render the transaction map, then click any node to open its case
+1. Open `http://localhost:3000` — you'll see the landing page (public website)
+2. Click **"Open the Investigator Console"** or **"Log in"** — redirects to `/app/queue`
+3. The Queue shows all flagged accounts with real risk scores from the hybrid scorer
+4. Click any case — opens the Case Workspace (two-pane layout):
+   - **Left pane** — risk gauge, AI explanation with citations, timeline, parties, narrative, SAR fields
+   - **Right pane** — interactive transaction graph (toggle with audit log)
+5. Navigate via the sidebar: **Queue**, **Graph Explorer**, **Reports**, **Settings**
+6. In the Graph Explorer, click any node to see account details and open its case
+7. Use the **Decision Panel** (Escalate / Close / Needs Review / Generate Report) — every decision requires a reason and is logged to the audit trail
 
 ---
 
@@ -129,11 +135,15 @@ The dashboard will be available at `http://localhost:3000`
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/health` | Service health check |
-| `GET` | `/graph` | Flagged accounts + 1-hop neighbors (for browser rendering) |
+| `GET` | `/graph` | All flagged accounts + 1-hop neighbors (for graph explorer) |
+| `GET` | `/graph/{account_id}` | Subgraph for a specific account (case workspace) |
 | `POST` | `/detect` | Run all 3 pattern detectors on demo data |
 | `POST` | `/score` | Compute hybrid risk score (rule + ML) for an account |
-| `POST` | `/investigate` | Full agent pipeline: alert → case → explanation |
+| `POST` | `/investigate` | Full pipeline: detection + scoring + alert + case + explanation |
 | `POST` | `/case` | Build a case report only |
+| `GET` | `/api/v1/cases` | All cases with real risk scores (used by queue + reports) |
+| `POST` | `/api/v1/cases/decide` | Record a decision (escalate/close/review/report) |
+| `GET` | `/api/v1/cases/decisions` | List all decisions (optional filter by case_id) |
 
 All endpoints are wired to real logic — no stubs.
 
@@ -146,21 +156,24 @@ EGY-Sentinel-AML/
 ├── schemas/                    # 5 locked JSON schemas (contracts)
 ├── data/
 │   ├── demo.csv                # 206-row dataset, 5 planted patterns
-│   └── loader.py               # load_sample() + get_demo_stats()
+│   ├── loader.py               # load_sample() + patterns cache + get_demo_stats()
+│   └── decisions.jsonl         # Audit trail of case decisions
 ├── models/
-│   └── randomforest_...joblib  # Trained RandomForest pipeline (4.5 MB)
+│   └── _RandomForest_paysim_fraud_model.joblib  # Trained RandomForest (4.5 MB)
 ├── egysentinel/                # Main Python package
-│   ├── api/                    # FastAPI service (AI-5)
-│   ├── graph/                  # NetworkX builder + serializer (DS-2)
-│   ├── detect/                 # 3 pattern detectors (DS-2)
-│   ├── score/                  # Rule + ML + combine (DS-1/3)
-│   └── agents/                 # LLM client + orchestrator + 3 agents (AI-1/2/3/4)
-├── demo/                       # Next.js frontend (AI-5)
-│   ├── app/                    # Landing + Dashboard + Alerts + Cases
-│   ├── components/             # RiskGauge, GraphCanvas, case tabs, agent-trace
+│   ├── api/                    # FastAPI service + decisions + cases API
+│   ├── graph/                  # NetworkX builder + serializer
+│   ├── detect/                 # 3 pattern detectors (circular, fan_out, dense_cluster)
+│   ├── score/                  # Features + rule scorer + ML scorer + combine
+│   └── agents/                 # LLM client + orchestrator + alert + case builder + explanation
+├── demo/                       # Next.js frontend
+│   ├── app/
+│   │   ├── (marketing)/        # 7 public pages (home, product, how-it-works, security, about, contact, login)
+│   │   └── app/                # 5 app pages (queue, cases/[id], graph, reports, settings)
+│   ├── components/             # 25 atomic components (atoms, molecules, organisms, templates)
 │   ├── lib/                    # API client + formatters
 │   └── types/                  # TypeScript types (match Pydantic)
-├── tests/                      # 231 unit + integration tests
+├── tests/                      # 198 tests across 9 files
 ├── scripts/
 │   └── generate_demo_data.py   # Deterministic dataset generator (seed=42)
 └── requirements.txt
@@ -175,7 +188,7 @@ EGY-Sentinel-AML/
 | **Data** | Python, Pandas, PyArrow | Free |
 | **Graph** | NetworkX 3.x | Free |
 | **ML** | scikit-learn (RandomForest) | Free |
-| **AI** | OpenRouter (Qwen3 Next 80B — free tier) | Free |
+| **LLM** | OpenRouter (Qwen3 Next 80B — free tier) | Free |
 | **API** | FastAPI, Pydantic, Uvicorn | Free |
 | **Frontend** | Next.js 16, React 19, TypeScript, Tailwind | Free |
 | **Total** | | **$0** |
@@ -265,30 +278,20 @@ final_score = 0.5 * rule_score + 0.5 * ml_prob * 100
 # Run the full test suite
 python -m pytest tests/ -v
 
-# 231 tests covering:
-# - AI-2 alert agent (4 tests)
-# - AI-3 case builder + pipeline (51 tests)
-# - AI-4 explanation agent (16 tests)
-# - AI-1 orchestrator (29 tests)
-# - AI-1 LLM client (24 tests, all HTTP mocked)
-# - DS-1/3 scoring modules (34 tests)
-# - DS-2 graph + detectors (38 tests)
-# - Demo data + loader (21 tests)
-# - Enum drift / schema alignment (14 tests)
+# 198 tests across 9 files:
+# - test_alert_agent.py (4 tests) — alert priority and fallback
+# - test_case_builder.py (41 tests) — case building, parties, timeline, SAR
+# - test_explanation_agent.py (16 tests) — explanation, citations, confidence
+# - test_llm_client.py (24 tests) — LLM client (HTTP mocked)
+# - test_orchestrator.py (29 tests) — pipeline, enum normalization, determinism
+# - test_pipeline.py (24 tests) — pattern normalization, batch processing
+# - test_score.py (34 tests) — features, rules, ML, combine
+# - test_demo_data.py (21 tests) — data structure, planted patterns, loader
+# - test_e2e_pipeline.py (5 tests) — full pipeline, zero injection, score consistency
 ```
 
 ---
 
-## Team
+## License
 
-| Role | Member | Owns |
-|------|--------|------|
-| Tech Lead / AI-5 | Farah Elshenawi | FastAPI, Next.js, Integration, Demo Data |
-| DS-1/3 | Data & ML Engineer | PaySim, EDA, RandomForest, Rule Scorer |
-| DS-2 | Graph Engineer | NetworkX, 3 Detectors, Graph Builder |
-| AI-1 | LLM Infrastructure | OpenRouter Client, Orchestrator |
-| AI-2 | Alert Agent | Priority classification |
-| AI-3 | Case Builder Agent | SAR reports, Evidence assembly |
-| AI-4 | Explanation Agent | Plain-English justification, Citations |
-
----
+Academic Capstone Project — 2026
